@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "BRUR Assignment Cover Maker"
+description = "A responsive Begum Rokeya University assignment cover page maker for students, with searchable CSE faculty, course selection, group support, fixed cover designs, live preview, drafts, printing, and downloads."
+version = "1.0.0"
+id = "artifacts/brur-cover-maker"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24255
+
+[services.development]
+run = "pnpm --filter @workspace/brur-cover-maker run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/brur-cover-maker", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/brur-cover-maker/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24255"
+BASE_PATH = "/"

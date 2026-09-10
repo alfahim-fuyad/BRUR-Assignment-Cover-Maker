@@ -1,0 +1,38 @@
+> Cloning from https://github.com/alfahim-fuyad/BRUR-Assignment-Cover-Maker
+==> Checking out commit 772ffa10e63d3a25c7e0ba17742a55fd96d6f329 in branch main
+==> Using Node.js version 24.14.1 (default)
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Running build command 'pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build'...
+> @workspace/api-server@0.0.0 build /opt/render/project/src/artifacts/api-server
+> node ./build.mjs
+  dist/index.mjs                       1.4mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.1kb
+  dist/pino-pretty.mjs               114.4kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                   2.1mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.0kb
+  dist/pino-pretty.mjs.map           203.6kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+⚡ Done in 267ms
+==> Uploading build...
+==> Uploaded in 4.0s. Compression took 2.4s
+==> Build successful 🎉
+==> Deploying...
+==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+==> Running 'pnpm --filter @workspace/api-server run start'
+> @workspace/api-server@0.0.0 start /opt/render/project/src/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+{"level":30,"time":1789049109164,"pid":109,"hostname":"srv-dahbhkp5efls738qrccg-hibernate-75f56cc48d-pj6ht","port":10000,"msg":"Server listening"}
+{"level":30,"time":1789049109761,"pid":109,"hostname":"srv-dahbhkp5efls738qrccg-hibernate-75f56cc48d-pj6ht","req":{"id":1,"method":"HEAD","url":"/"},"res":{"statusCode":404},"responseTime":6,"msg":"request completed"}
+==> Your service is live 🎉
+==> 
+==> ///////////////////////////////////////////////////////////
+==> 
+==> Available at your primary URL https://brur-assignment-cover-maker.onrender.com
+==> 
+==> ///////////////////////////////////////////////////////////
+{"level":30,"time":1789049114398,"pid":109,"hostname":"srv-dahbhkp5efls738qrccg-hibernate-75f56cc48d-pj6ht","req":{"id":2,"method":"GET","url":"/"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+{"level":30,"time":1789049115743,"pid":109,"hostname":"srv-dahbhkp5efls738qrccg-hibernate-75f56cc48d-pj6ht","req":{"id":3,"method":"GET","url":"/"},"res":{"statusCode":404},"responseTime":0,"msg":"request completed"}
+{"level":30,"time":1789049130811,"pid":109,"hostname":"srv-dahbhkp5efls738qrccg-hibernate-75f56cc48d-pj6ht","req":{"id":4,"method":"GET","url":"/"},"res":{"statusCode":404},"responseTime":0,"msg":"request completed"}

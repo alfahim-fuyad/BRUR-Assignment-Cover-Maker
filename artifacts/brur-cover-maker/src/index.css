@@ -1,0 +1,160 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --font-sans: var(--app-font-sans);
+  --font-serif: var(--app-font-serif);
+  --font-mono: var(--app-font-mono);
+  --font-display: var(--app-font-display);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: 210 32% 96%;
+  --foreground: 211 40% 16%;
+  --border: 210 22% 87%;
+  --input: 210 22% 84%;
+  --ring: 168 74% 37%;
+  --card: 0 0% 100%;
+  --card-foreground: 211 40% 16%;
+  --card-border: 210 22% 89%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 211 40% 16%;
+  --popover-border: 210 22% 87%;
+  --primary: 168 74% 30%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 201 76% 93%;
+  --secondary-foreground: 201 55% 23%;
+  --muted: 210 25% 93%;
+  --muted-foreground: 211 17% 45%;
+  --accent: 11 78% 60%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 68% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --app-font-sans: 'DM Sans', sans-serif;
+  --app-font-display: 'Space Grotesk', sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'Space Grotesk', monospace;
+  --radius: 0.8rem;
+  --sidebar: 194 51% 20%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-border: 194 41% 30%;
+  --sidebar-primary: 168 74% 42%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 194 36% 28%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --shadow-soft: 0 14px 38px rgba(20, 72, 89, 0.09);
+}
+
+.dark {
+  --background: 211 38% 11%;
+  --foreground: 0 0% 96%;
+  --border: 211 26% 25%;
+  --input: 211 26% 25%;
+  --ring: 168 74% 42%;
+  --card: 211 34% 15%;
+  --card-foreground: 0 0% 96%;
+  --card-border: 211 26% 25%;
+  --popover: 211 34% 15%;
+  --popover-foreground: 0 0% 96%;
+  --popover-border: 211 26% 25%;
+  --primary: 168 74% 42%;
+  --primary-foreground: 211 38% 11%;
+  --secondary: 201 35% 23%;
+  --secondary-foreground: 201 70% 87%;
+  --muted: 211 28% 21%;
+  --muted-foreground: 211 17% 68%;
+  --accent: 11 78% 60%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 68% 55%;
+  --destructive-foreground: 0 0% 100%;
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { background: hsl(var(--background)); }
+  body { @apply font-sans antialiased bg-background text-foreground; min-width: 320px; }
+  button, input, select, textarea { font: inherit; }
+}
+
+@keyframes rise-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes soft-pop { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: scale(1); } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.rise-in { animation: rise-in .45s ease-out both; }
+.soft-pop { animation: soft-pop .35s ease-out both; }
+.field-label { @apply mb-1.5 block text-[11px] font-bold uppercase tracking-[0.13em] text-slate-500; }
+.input-shell { @apply w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-600/10; }
+.select-shell { @apply w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-600/10; }
+.section-card { @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_28px_rgba(17,55,74,0.05)] sm:p-6; }
+.mesh-bg { background-image: radial-gradient(circle at 15% 15%, rgba(32, 177, 153, .11), transparent 27%), radial-gradient(circle at 92% 10%, rgba(226, 89, 65, .08), transparent 25%); }
+.paper-shadow { box-shadow: 0 18px 44px rgba(22, 55, 70, .16), 0 2px 6px rgba(22, 55, 70, .08); }
+.preview-frame { @apply mx-auto max-w-[650px] rounded-[1.25rem] bg-[#dfe9e9] p-4 shadow-[0_12px_34px_rgba(22,55,70,0.08)] sm:p-7; }
+.cover-paper { @apply relative mx-auto aspect-[1/1.414] w-full max-w-[520px] overflow-hidden bg-white; box-shadow: 0 18px 44px rgba(22, 55, 70, .16), 0 2px 6px rgba(22, 55, 70, .08); }
+.docx-cover { font-family: "Times New Roman", Times, serif; color: #111; line-height: 1.15; }
+.docx-logo { width: 62px; height: 62px; margin-top: 2%; }
+.docx-university { margin-top: 3%; font-size: clamp(16px, 4vw, 21px); font-weight: 700; }
+.docx-department { margin-top: 1.5%; font-size: clamp(11px, 2.65vw, 14px); }
+.docx-assignment { margin-top: 10%; font-size: clamp(13px, 3.05vw, 16px); font-weight: 700; }
+.docx-session, .docx-course { margin-top: 3.5%; font-size: clamp(9px, 2vw, 11px); }
+.docx-session strong, .docx-submission strong, .docx-submitted-to strong { font-weight: 700; }
+.docx-topic { margin: 9% auto 0; max-width: 84%; padding: 1.5% 3%; color: #2563eb; background: #eff6ff; font-size: clamp(12px, 2.65vw, 14px); font-weight: 700; }
+.docx-submission, .docx-submitted-to { margin: 8% auto 0; width: 84%; text-align: left; font-size: clamp(9px, 2vw, 11px); }
+.docx-submission p, .docx-submitted-to p { margin: 0 0 1.2%; }
+.docx-group-label { float: right; }
+.docx-submitted-to { margin-top: 8%; }
+.docx-date { margin-top: 7%; font-size: clamp(8px, 1.55vw, 13px); }
+.docx-professional .docx-logo { margin-top: 0; }
+.docx-professional .docx-assignment { margin-top: 8%; }
+.docx-modern { aspect-ratio: 11910 / 16845; }
+.docx-modern .docx-assignment { margin-top: 13%; }
+.docx-group .docx-topic { margin-top: 8%; }
+.docx-group .docx-submission { margin-top: 6%; }
+.simple-cover { border-top: 5px solid #1a8d7f; }
+.professional-cover { border: 1px solid #b6d9d3; }
+.modern-cover { background: linear-gradient(135deg, #fbfdfc 0%, #f2f8f7 100%); }
+.modern-mark { position: absolute; width: 180px; height: 180px; right: -72px; top: -72px; border-radius: 999px; background: #1a8d7f; opacity: .12; }
+.preview-label { @apply text-[9px] font-bold uppercase tracking-[0.13em] text-slate-400; }
+.template-option { @apply relative rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-left transition hover:-translate-y-0.5 hover:border-teal-300 hover:bg-white; }
+.template-option-active { @apply border-teal-400 bg-teal-50/45 ring-2 ring-teal-500/15; }
+.template-mini { @apply flex h-20 flex-col items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white; }
+.template-mini span { @apply block h-1 w-1/2 rounded-full bg-slate-200; }
+.mini-simple { border-top: 3px solid #1a8d7f; }
+.mini-simple span:first-child { @apply h-5 w-5 rounded-full bg-teal-100; }
+.mini-professional { @apply p-2; }
+.mini-professional::before { content: ''; position: absolute; width: 54px; height: 48px; border: 1px solid #1a8d7f; opacity: .35; }
+.mini-professional span:first-child { @apply h-5 w-5 rounded-full bg-teal-100; }
+.mini-modern { @apply items-start pl-5; border-left: 3px solid #e56b51; }
+.mini-modern span:first-child { @apply h-3 w-3 rounded-full bg-[#e56b51]; }
+@media print {
+  body { background: white; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
