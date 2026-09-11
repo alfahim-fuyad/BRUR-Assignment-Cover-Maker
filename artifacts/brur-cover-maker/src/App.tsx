@@ -27,10 +27,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import logoPath from '@assets/BRUR_Logo_1789044011278.svg';
-import simpleTemplateUrl from '@assets/simple_1789047566420.docx?url';
-import professionalTemplateUrl from '@assets/professional_1789047566419.docx?url';
-import modernTemplateUrl from '@assets/modern_1789047566419.docx?url';
-import groupTemplateUrl from '@assets/group_1789047566416.docx?url';
 
 const queryClient = new QueryClient();
 
@@ -343,127 +339,310 @@ function coverText(form: FormState) {
   return `${form.university || 'BEGUM ROKEYA UNIVERSITY'}\n\n${form.assignment || 'ASSIGNMENT'}\n\n${form.topic || 'Untitled assignment'}\n\nCourse title: ${form.courseTitle}\nCourse code: ${form.courseCode}\nDepartment: ${form.department}\nSession: ${form.session}\n\nSubmitted by-\n${form.studentName}\nID: ${form.studentId}\nRegistration no: ${form.registrationNo}\n${members.length ? `\nGroup members:\n${members.map((member, index) => `Member ${index + 1}: ${member}`).join('\n')}\n` : ''}\nSubmitted to-\n${form.teacherName}\n${form.teacherDesignation}\n${form.teacherDepartment}\n${form.university}\nDate of submission: ${form.date}`;
 }
 
-const wordNamespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+// ---------------------------------------------------------------------------
+// DOC export — the .docx is generated from scratch for the chosen design
+// (simple / professional / modern), mirroring the live preview and its PDF,
+// so it always opens as a clean, correctly formatted A4 cover page instead of
+// a mangled patch of the old binary templates.
+// Units: OOXML lengths are twips (1/1440"), font sizes are half-points, letter
+// spacing is twentieths of a point. The preview sheet is 520 CSS px mapped
+// onto A4 (1px = 0.403846mm), which yields the factors below.
+// ---------------------------------------------------------------------------
+const DOCX_TW_PER_PX = (210 / 520) * 56.6929;
+const DOCX_EMU_PER_PX = (210 / 520) * 36000;
+const DOCX_HALF_POINTS_PER_PX = 2.28954; // 1px = 1.14477pt
+const DOCX_CHAR_SPACE_PER_EM = 22.8954; // 1em of tracking, in 1/20 pt
+const DOCX_LOGO_REL = 'rId2';
 
-function replaceDocxText(xml: string, replacements: Array<{ source: string; target: string; all?: boolean }>) {
-  const document = new DOMParser().parseFromString(xml, 'application/xml');
-  const countOccurrences = (value: string, source: string) => {
-    if (!source) return 0;
-    let count = 0;
-    let from = 0;
-    while (true) {
-      const index = value.indexOf(source, from);
-      if (index < 0) return count;
-      count += 1;
-      from = index + source.length;
-    }
-  };
-  const replaceOne = (source: string, target: string) => {
-    const nodes = Array.from(document.getElementsByTagNameNS(wordNamespace, 't'));
-    const fullText = nodes.map((node) => node.textContent ?? '').join('');
-    const start = fullText.indexOf(source);
-    if (start < 0) return false;
-    const end = start + source.length;
-    let cursor = 0;
-    let startNode = -1;
-    let endNode = -1;
-    let startOffset = 0;
-    let endOffset = 0;
-    nodes.forEach((node, index) => {
-      const text = node.textContent ?? '';
-      if (startNode < 0 && start >= cursor && start <= cursor + text.length) {
-        startNode = index;
-        startOffset = start - cursor;
-      }
-      if (endNode < 0 && end >= cursor && end <= cursor + text.length) {
-        endNode = index;
-        endOffset = end - cursor;
-      }
-      cursor += text.length;
-    });
-    if (startNode < 0 || endNode < 0) return false;
-    if (startNode === endNode) {
-      const text = nodes[startNode].textContent ?? '';
-      nodes[startNode].textContent = `${text.slice(0, startOffset)}${target}${text.slice(endOffset)}`;
-      return true;
-    }
-    const firstText = nodes[startNode].textContent ?? '';
-    const lastText = nodes[endNode].textContent ?? '';
-    nodes[startNode].textContent = `${firstText.slice(0, startOffset)}${target}${lastText.slice(endOffset)}`;
-    for (let index = startNode + 1; index <= endNode; index += 1) nodes[index].textContent = '';
-    return true;
-  };
+const DOCX_INK = '111111';
+const DOCX_NAVY = '164A5B';
+const DOCX_GOLD = 'B9973F';
+const DOCX_SOFT = '374151';
+const DOCX_TOPIC_INK = '2563EB';
+const DOCX_TOPIC_BG = 'EFF6FF';
+const DOCX_MIST = 'CFE3EA';
+const DOCX_WHITE = 'FFFFFF';
+const DOCX_CORAL = 'E56B51';
+const DOCX_TEAL = '1A8D7F';
+const DOCX_TEAL_RULE = '1A9B86';
+const DOCX_BY_LABEL = '147A6E';
+const DOCX_TO_LABEL = 'C94F30';
+const DOCX_HERO = '0F3A47';
+const DOCX_CARD_BG = 'F4FAF9';
+const DOCX_BAND_BG = 'F8FBFC';
 
-  replacements.forEach(({ source, target, all }) => {
-    const nodes = Array.from(document.getElementsByTagNameNS(wordNamespace, 't'));
-    const occurrences = all ? countOccurrences(nodes.map((node) => node.textContent ?? '').join(''), source) : 1;
-    for (let index = 0; index < occurrences; index += 1) {
-      if (!replaceOne(source, target)) break;
-    }
+const DOCX_CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
+
+const DOCX_ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`;
+
+const DOCX_DOCUMENT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="${DOCX_LOGO_REL}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/></Relationships>`;
+
+const DOCX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:color w:val="${DOCX_INK}"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>`;
+
+const DOCX_APP_PROPS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>BRUR Cover Maker</Application></Properties>`;
+
+function escXml(value: string) {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+type DocxSeg = { text: string; bold?: boolean; color?: string; sz?: number; charSpace?: number };
+type DocxPara = {
+  segs?: DocxSeg[];
+  drawing?: { px: number; relId: string; id: number };
+  sz?: number;
+  bold?: boolean;
+  color?: string;
+  align?: 'left' | 'center' | 'right';
+  before?: number;
+  after?: number;
+  line?: number; // exact line height in twips — used for solid colour bars / spacers
+  indLeft?: number;
+  indRight?: number;
+  shd?: string;
+  charSpace?: number;
+};
+
+function dseg(text: string, extra: Partial<DocxSeg> = {}): DocxSeg {
+  return { text, ...extra };
+}
+
+function docxRunXml(run: DocxSeg, base: { sz: number; bold?: boolean; color?: string; charSpace?: number }) {
+  const sz = Math.round(run.sz ?? base.sz);
+  const bold = run.bold ?? base.bold ?? false;
+  const color = run.color ?? base.color;
+  const charSpace = run.charSpace ?? base.charSpace;
+  let rpr = '<w:rPr>';
+  if (bold) rpr += '<w:b/><w:bCs/>';
+  if (color) rpr += `<w:color w:val="${color}"/>`;
+  if (charSpace) rpr += `<w:spacing w:val="${Math.round(charSpace)}"/>`;
+  rpr += `<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr>`;
+  return `<w:r>${rpr}<w:t xml:space="preserve">${escXml(run.text)}</w:t></w:r>`;
+}
+
+function docxParaXml(para: DocxPara) {
+  let ppr = '';
+  if (para.shd) ppr += `<w:shd w:val="clear" w:color="auto" w:fill="${para.shd}"/>`;
+  const spacing = `<w:spacing w:before="${Math.round(para.before ?? 0)}" w:after="${Math.round(para.after ?? 0)}"${para.line ? ` w:line="${Math.round(para.line)}" w:lineRule="exact"` : ''}/>`;
+  ppr += spacing;
+  if (para.indLeft || para.indRight) ppr += `<w:ind${para.indLeft ? ` w:left="${Math.round(para.indLeft)}"` : ''}${para.indRight ? ` w:right="${Math.round(para.indRight)}"` : ''}/>`;
+  ppr += `<w:jc w:val="${para.align ?? 'left'}"/>`;
+  const markSize = Math.round(para.line ? 2 : (para.sz ?? 24));
+  ppr += `<w:rPr><w:sz w:val="${markSize}"/><w:szCs w:val="${markSize}"/></w:rPr>`;
+  let body = '';
+  if (para.drawing) body += docxDrawingXml(para.drawing.px, para.drawing.relId, para.drawing.id);
+  if (para.segs?.length) {
+    body += para.segs.map((run) => docxRunXml(run, { sz: para.sz ?? 24, bold: para.bold, color: para.color, charSpace: para.charSpace })).join('');
+  }
+  return `<w:p><w:pPr>${ppr}</w:pPr>${body}</w:p>`;
+}
+
+function docxDrawingXml(px: number, relId: string, id: number) {
+  const emu = Math.round(px * DOCX_EMU_PER_PX);
+  return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${emu}" cy="${emu}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${id}" name="BRUR crest"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="BRUR crest"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${emu}" cy="${emu}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+}
+
+// Solid colour bar (gold rules, coral strips, spacers) as an exact-height paragraph.
+function docxBarXml(lineTw: number, before: number, fill: string | undefined, indLeft = 0, indRight = 0) {
+  return docxParaXml({ line: lineTw, before, shd: fill, indLeft: indLeft || undefined, indRight: indRight || undefined });
+}
+
+type DocxCellMargin = { top?: number; bottom?: number; left?: number; right?: number };
+
+function docxCellXml(paras: string[], opts: { width: number; shd?: string; margin?: DocxCellMargin; borderTop?: number; borderBottom?: number; borderColor?: string }) {
+  let tcpr = `<w:tcW w:w="${opts.width}" w:type="dxa"/>`;
+  if (opts.borderTop || opts.borderBottom) {
+    const color = opts.borderColor ?? 'auto';
+    tcpr += `<w:tcBorders>${opts.borderTop ? `<w:top w:val="single" w:sz="${opts.borderTop}" w:space="0" w:color="${color}"/>` : '<w:top w:val="nil"/>'}${opts.borderBottom ? `<w:bottom w:val="single" w:sz="${opts.borderBottom}" w:space="0" w:color="${color}"/>` : '<w:bottom w:val="nil"/>'}</w:tcBorders>`;
+  }
+  if (opts.shd) tcpr += `<w:shd w:val="clear" w:color="auto" w:fill="${opts.shd}"/>`;
+  if (opts.margin) {
+    const m = opts.margin;
+    tcpr += `<w:tcMar>${m.top ? `<w:top w:w="${m.top}" w:type="dxa"/>` : ''}${m.left ? `<w:left w:w="${m.left}" w:type="dxa"/>` : ''}${m.bottom ? `<w:bottom w:w="${m.bottom}" w:type="dxa"/>` : ''}${m.right ? `<w:right w:w="${m.right}" w:type="dxa"/>` : ''}</w:tcMar>`;
+  }
+  return `<w:tc><w:tcPr>${tcpr}</w:tcPr>${paras.join('')}</w:tc>`;
+}
+
+function docxSpacerCellXml(width: number) {
+  return `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr></w:p></w:tc>`;
+}
+
+function docxTableXml(width: number, cols: number[], cells: string[]) {
+  const grid = cols.map((c) => `<w:gridCol w:w="${c}"/>`).join('');
+  const nil = (edge: string) => `<w:${edge} w:val="none" w:sz="0" w:space="0" w:color="auto"/>`;
+  return `<w:tbl><w:tblPr><w:tblW w:w="${width}" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders>${nil('top')}${nil('left')}${nil('bottom')}${nil('right')}${nil('insideH')}${nil('insideV')}</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${grid}</w:tblGrid><w:tr>${cells.join('')}</w:tr></w:tbl>`;
+}
+
+function docxSectXml(margin: number, pageBorder: boolean) {
+  const borders = pageBorder ? `<w:pgBorders w:offsetFrom="page"><w:top w:val="double" w:sz="6" w:space="16" w:color="${DOCX_NAVY}"/><w:left w:val="double" w:sz="6" w:space="16" w:color="${DOCX_NAVY}"/><w:bottom w:val="double" w:sz="6" w:space="16" w:color="${DOCX_NAVY}"/><w:right w:val="double" w:sz="6" w:space="16" w:color="${DOCX_NAVY}"/></w:pgBorders>` : '';
+  return `<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="0" w:footer="0" w:gutter="0"/>${borders}<w:cols w:space="708"/><w:docGrid w:linePitch="360"/></w:sectPr>`;
+}
+
+function docxValues(form: FormState) {
+  const members = form.assignmentType === 'group' ? form.groupMembers.filter(Boolean) : [];
+  return {
+    university: form.university || 'Begum Rokeya University',
+    department: form.department || form.teacherDepartment || 'Department',
+    assignment: form.assignment || 'Assignment',
+    session: form.session || '2024-25',
+    courseTitle: form.courseTitle || 'Course title',
+    courseCode: form.courseCode || 'Course code',
+    topic: form.topic || 'Assignment topic',
+    studentName: form.studentName || 'Name',
+    studentId: form.studentId || 'ID',
+    registrationNo: form.registrationNo || 'Registration no',
+    teacherName: form.teacherName || 'Teacher name',
+    teacherDesignation: form.teacherDesignation || 'Designation',
+    teacherDepartment: form.teacherDepartment || 'Department',
+    date: form.date || 'Date',
+    members,
+    group: form.assignmentType === 'group',
+  };
+}
+
+// Simple finish — centered Times layout mirroring the .docx-* preview styles.
+function simpleDocxBody(form: FormState): string {
+  const v = docxValues(form);
+  const indent = 806; // 84% block centred in the 440px content box
+  const ps = [
+    docxParaXml({ drawing: { px: 62, relId: DOCX_LOGO_REL, id: 1 }, align: 'center', before: 201 }),
+    docxParaXml({ segs: [dseg(v.university, { bold: true })], sz: 48, align: 'center', before: 302 }),
+    docxParaXml({ segs: [dseg(v.department)], sz: 32, align: 'center', before: 151 }),
+    docxParaXml({ segs: [dseg(v.assignment, { bold: true })], sz: 37, align: 'center', before: 1007 }),
+    docxParaXml({ segs: [dseg('Session:', { bold: true }), dseg(` ${v.session}`)], sz: 25, align: 'center', before: 353 }),
+    docxParaXml({ segs: [dseg(`Course Title: ${v.courseTitle}`)], sz: 25, align: 'center', before: 353 }),
+    docxParaXml({ segs: [dseg(`Course Code: ${v.courseCode}`)], sz: 25, align: 'center', before: 353, after: 907 }),
+    docxTableXml(8461, [8461], [docxCellXml([docxParaXml({ segs: [dseg(v.topic, { bold: true })], sz: 32, color: DOCX_TOPIC_INK, align: 'center' })], { width: 8461, shd: DOCX_TOPIC_BG, margin: { top: 151, bottom: 151, left: 302, right: 302 } })]),
+    docxBarXml(806, 0, undefined), // gap below the topic pill
+    docxParaXml({ segs: [dseg('Submitted by-', { bold: true })], sz: 25, indLeft: indent, indRight: indent }),
+  ];
+  if (v.group) {
+    v.members.forEach((member) => ps.push(docxParaXml({ segs: [dseg(member)], sz: 25, indLeft: indent, indRight: indent })));
+  } else {
+    ps.push(docxParaXml({ segs: [dseg(v.studentName)], sz: 25, indLeft: indent, indRight: indent }));
+    ps.push(docxParaXml({ segs: [dseg('ID:', { bold: true }), dseg(` ${v.studentId}`)], sz: 25, indLeft: indent, indRight: indent }));
+    ps.push(docxParaXml({ segs: [dseg('Registration no:', { bold: true }), dseg(` ${v.registrationNo}`)], sz: 25, indLeft: indent, indRight: indent }));
+  }
+  ps.push(docxParaXml({ segs: [dseg('Submitted to-', { bold: true })], sz: 25, before: 806, indLeft: indent, indRight: indent }));
+  ps.push(docxParaXml({ segs: [dseg(v.teacherName)], sz: 25, indLeft: indent, indRight: indent }));
+  ps.push(docxParaXml({ segs: [dseg(v.teacherDesignation)], sz: 25, indLeft: indent, indRight: indent }));
+  ps.push(docxParaXml({ segs: [dseg(v.teacherDepartment)], sz: 25, indLeft: indent, indRight: indent }));
+  ps.push(docxParaXml({ segs: [dseg(v.university)], sz: 25, indLeft: indent, indRight: indent }));
+  ps.push(docxParaXml({ segs: [dseg('Date of submission:', { bold: true }), dseg(` ${v.date}`)], sz: 30, align: 'center', before: 1209 }));
+  return ps.join('');
+}
+
+// Professional finish — navy/gold framed cover with two Submitted By / To columns.
+function professionalDocxBody(form: FormState): string {
+  const v = docxValues(form);
+  const colWidth = 3961;
+  const ruleIndent = colWidth - 687; // 30px gold rule at the left edge of the cell
+  const label = (text: string) => docxParaXml({ segs: [dseg(text, { bold: true, color: DOCX_NAVY, charSpace: 32 })], sz: 23 });
+  const goldRule = () => docxBarXml(37, 69, DOCX_GOLD, 0, ruleIndent);
+  const byParas = [label('SUBMITTED BY'), goldRule()];
+  if (v.group) {
+    v.members.forEach((member, index) => byParas.push(docxParaXml({ segs: [dseg(member, { bold: true })], sz: 26, before: index ? 92 : 183 })));
+  } else {
+    byParas.push(docxParaXml({ segs: [dseg(v.studentName, { bold: true })], sz: 26, before: 183 }));
+    byParas.push(docxParaXml({ segs: [dseg('ID:', { bold: true, color: DOCX_NAVY }), dseg(` ${v.studentId}`)], sz: 24, before: 92 }));
+    byParas.push(docxParaXml({ segs: [dseg('Registration no:', { bold: true, color: DOCX_NAVY }), dseg(` ${v.registrationNo}`)], sz: 24, before: 92 }));
+  }
+  const toParas = [
+    label('SUBMITTED TO'),
+    goldRule(),
+    docxParaXml({ segs: [dseg(v.teacherName, { bold: true })], sz: 26, before: 183 }),
+    docxParaXml({ segs: [dseg(v.teacherDesignation)], sz: 24, before: 92 }),
+    docxParaXml({ segs: [dseg(v.teacherDepartment)], sz: 24, before: 92 }),
+    docxParaXml({ segs: [dseg(v.university)], sz: 24, before: 92 }),
+  ];
+  const ps = [
+    docxParaXml({ drawing: { px: 64, relId: DOCX_LOGO_REL, id: 1 }, align: 'center' }),
+    docxParaXml({ segs: [dseg(v.university.toUpperCase(), { bold: true, color: DOCX_NAVY })], sz: 46, align: 'center', before: 353 }),
+    docxParaXml({ segs: [dseg(v.department, { color: DOCX_SOFT })], sz: 29, align: 'center', before: 121 }),
+    docxBarXml(50, 242, DOCX_GOLD, 4533, 4533), // centred 44px gold divider
+    docxParaXml({ segs: [dseg(v.assignment.toUpperCase(), { bold: true, color: DOCX_NAVY, charSpace: 54 })], sz: 34, align: 'center', before: 756 }),
+    docxParaXml({ segs: [dseg('Session:', { bold: true, color: DOCX_NAVY }), dseg(` ${v.session}`)], sz: 25, align: 'center', before: 443 }),
+    docxParaXml({ segs: [dseg('Course Title:', { bold: true, color: DOCX_NAVY }), dseg(` ${v.courseTitle}`)], sz: 25, align: 'center', before: 181 }),
+    docxParaXml({ segs: [dseg('Course Code:', { bold: true, color: DOCX_NAVY }), dseg(` ${v.courseCode}`)], sz: 25, align: 'center', before: 181, after: 907 }),
+    docxTableXml(8461, [8461], [docxCellXml([docxParaXml({ segs: [dseg(v.topic, { bold: true, color: DOCX_NAVY })], sz: 32, align: 'center' })], { width: 8461, shd: DOCX_BAND_BG, borderTop: 20, borderBottom: 20, borderColor: DOCX_NAVY, margin: { top: 222, bottom: 222, left: 302, right: 302 } })]),
+    docxBarXml(1007, 0, undefined), // gap between the topic band and the columns
+    docxTableXml(8461, [colWidth, 539, colWidth], [docxCellXml(byParas, { width: colWidth }), docxSpacerCellXml(539), docxCellXml(toParas, { width: colWidth })]),
+    docxBarXml(3022, 0, undefined), // push the date toward the bottom like .pc-date
+    docxParaXml({ segs: [dseg('Date of submission:', { bold: true, color: DOCX_NAVY }), dseg(` ${v.date}`)], sz: 29, align: 'center' }),
+  ];
+  return ps.join('');
+}
+
+// Modern finish — full-bleed navy banner, coral accents and tinted info cards.
+function modernDocxBody(form: FormState): string {
+  const v = docxValues(form);
+  const cardWidth = 5055;
+  const cardPadding = 320;
+  const ruleIndent = cardWidth - 2 * cardPadding - 549; // 24px accent rule in the card
+  const meta = (label: string, value: string, before: number, extra: Partial<DocxPara> = {}) => docxParaXml({ segs: [dseg(`${label}:`, { bold: true, color: DOCX_TEAL }), dseg(` ${value}`, { color: DOCX_SOFT })], sz: 26, align: 'center', before, ...extra });
+  const byParas = [docxParaXml({ segs: [dseg('SUBMITTED BY', { bold: true, color: DOCX_BY_LABEL, charSpace: 34 })], sz: 22 }), docxBarXml(69, 114, DOCX_TEAL_RULE, 0, ruleIndent)];
+  if (v.group) {
+    v.members.forEach((member, index) => byParas.push(docxParaXml({ segs: [dseg(member, { bold: true, color: DOCX_INK })], sz: 26, before: index ? 114 : 206 })));
+  } else {
+    byParas.push(docxParaXml({ segs: [dseg(v.studentName, { bold: true, color: DOCX_INK })], sz: 26, before: 206 }));
+    byParas.push(docxParaXml({ segs: [dseg('ID:', { bold: true, color: DOCX_HERO }), dseg(` ${v.studentId}`, { color: DOCX_SOFT })], sz: 24, before: 114 }));
+    byParas.push(docxParaXml({ segs: [dseg('Registration no:', { bold: true, color: DOCX_HERO }), dseg(` ${v.registrationNo}`, { color: DOCX_SOFT })], sz: 24, before: 114 }));
+  }
+  const toParas = [
+    docxParaXml({ segs: [dseg('SUBMITTED TO', { bold: true, color: DOCX_TO_LABEL, charSpace: 34 })], sz: 22 }),
+    docxBarXml(69, 114, DOCX_CORAL, 0, ruleIndent),
+    docxParaXml({ segs: [dseg(v.teacherName, { bold: true, color: DOCX_INK })], sz: 26, before: 206 }),
+    docxParaXml({ segs: [dseg(v.teacherDesignation, { color: DOCX_SOFT })], sz: 24, before: 114 }),
+    docxParaXml({ segs: [dseg(v.teacherDepartment, { color: DOCX_SOFT })], sz: 24, before: 114 }),
+    docxParaXml({ segs: [dseg(v.university, { color: DOCX_SOFT })], sz: 24, before: 114 }),
+  ];
+  const cardCell = (paras: string[]) => docxCellXml(paras, { width: cardWidth, shd: DOCX_CARD_BG, margin: { top: cardPadding, bottom: cardPadding, left: cardPadding, right: cardPadding } });
+  const ps = [
+    docxBarXml(824, 0, DOCX_NAVY), // banner top padding
+    docxParaXml({ drawing: { px: 64, relId: DOCX_LOGO_REL, id: 1 }, align: 'center', shd: DOCX_NAVY }),
+    docxParaXml({ segs: [dseg(v.university.toUpperCase(), { bold: true, color: DOCX_WHITE, charSpace: 36 })], sz: 46, align: 'center', before: 320, shd: DOCX_NAVY }),
+    docxParaXml({ segs: [dseg(v.department, { color: DOCX_MIST })], sz: 29, align: 'center', before: 160, shd: DOCX_NAVY }),
+    docxBarXml(855, 0, DOCX_NAVY), // banner bottom padding
+    docxBarXml(92, 0, DOCX_CORAL), // 4px coral strip
+    docxParaXml({ segs: [dseg(v.assignment.toUpperCase(), { bold: true, color: DOCX_CORAL, charSpace: 60 })], sz: 25, align: 'center', before: 687 }),
+    docxParaXml({ segs: [dseg(v.topic, { bold: true, color: DOCX_HERO })], sz: 50, align: 'center', before: 275, indLeft: 715, indRight: 715 }),
+    docxBarXml(92, 320, DOCX_CORAL, 5312, 5312), // 56px coral underline
+    meta('Session', v.session, 458),
+    meta('Course Title', v.courseTitle, 160),
+    meta('Course Code', v.courseCode, 160, { after: 595 }),
+    docxTableXml(10477, [cardWidth, 366, cardWidth], [cardCell(byParas), docxSpacerCellXml(366), cardCell(toParas)]),
+    docxBarXml(2976, 0, undefined), // .mc-date gap
+    docxParaXml({ segs: [dseg('Date of submission:', { bold: true, color: DOCX_TEAL }), dseg(` ${v.date}`)], sz: 27, align: 'center' }),
+  ];
+  return ps.join('');
+}
+
+function buildDocxDocument(form: FormState): string {
+  const body = form.design === 'professional' ? professionalDocxBody(form) : form.design === 'modern' ? modernDocxBody(form) : simpleDocxBody(form);
+  const margin = form.design === 'modern' ? 0 : 917; // 40px preview padding, 0 for the full-bleed banner
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>${body}${docxSectXml(margin, form.design === 'professional')}</w:body></w:document>`;
+}
+
+function docxCoreProps(form: FormState): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${escXml(form.topic || 'BRUR assignment cover')}</dc:title><dc:creator>BRUR Cover Maker</dc:creator><cp:lastModifiedBy>BRUR Cover Maker</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">2026-01-01T00:00:00.000Z</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">2026-01-01T00:00:00.000Z</dcterms:modified></cp:coreProperties>`;
+}
+
+async function createDocx(form: FormState) {
+  const logoDataUrl = await loadImageDataUrl(logoPath);
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', DOCX_CONTENT_TYPES);
+  zip.file('_rels/.rels', DOCX_ROOT_RELS);
+  zip.file('docProps/core.xml', docxCoreProps(form));
+  zip.file('docProps/app.xml', DOCX_APP_PROPS);
+  zip.file('word/document.xml', buildDocxDocument(form));
+  zip.file('word/_rels/document.xml.rels', DOCX_DOCUMENT_RELS);
+  zip.file('word/styles.xml', DOCX_STYLES);
+  zip.file('word/media/image1.png', logoDataUrl.slice(logoDataUrl.indexOf(',') + 1), { base64: true });
+  return zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    compression: 'DEFLATE',
   });
-  return new XMLSerializer().serializeToString(document);
 }
-
-function setDocxRunFormatting(run: Element, size: string, bold: boolean, color?: string) {
-  let properties = run.getElementsByTagNameNS(wordNamespace, 'rPr')[0];
-  if (!properties) {
-    properties = run.ownerDocument!.createElementNS(wordNamespace, 'w:rPr');
-    run.insertBefore(properties, run.firstChild);
-  }
-  const boldNodes = Array.from(properties.getElementsByTagNameNS(wordNamespace, 'b'));
-  const boldCsNodes = Array.from(properties.getElementsByTagNameNS(wordNamespace, 'bCs'));
-  [...boldNodes, ...boldCsNodes].forEach((node) => properties.removeChild(node));
-  if (bold) {
-    properties.appendChild(run.ownerDocument!.createElementNS(wordNamespace, 'w:b'));
-  }
-  const setValue = (tagName: string, value: string) => {
-    let node = properties!.getElementsByTagNameNS(wordNamespace, tagName)[0];
-    if (!node) {
-      node = run.ownerDocument!.createElementNS(wordNamespace, `w:${tagName}`);
-      properties!.appendChild(node);
-    }
-    node.setAttributeNS(wordNamespace, 'w:val', value);
-  };
-  setValue('sz', size);
-  setValue('szCs', size);
-  if (color) {
-    let colorNode = properties.getElementsByTagNameNS(wordNamespace, 'color')[0];
-    if (!colorNode) {
-      colorNode = run.ownerDocument!.createElementNS(wordNamespace, 'w:color');
-      properties.appendChild(colorNode);
-    }
-    colorNode.setAttributeNS(wordNamespace, 'w:val', color);
-    colorNode.removeAttributeNS(wordNamespace, 'themeColor');
-    colorNode.removeAttributeNS(wordNamespace, 'themeShade');
-  }
-}
-
-function applySimpleDocxTypography(xml: string, topic: string) {
-  const document = new DOMParser().parseFromString(xml, 'application/xml');
-  const paragraphs = Array.from(document.getElementsByTagNameNS(wordNamespace, 'p'));
-  paragraphs.forEach((paragraph) => {
-    const text = Array.from(paragraph.getElementsByTagNameNS(wordNamespace, 't')).map((node) => node.textContent ?? '').join('').trim();
-    if (!text) return;
-
-    const isUniversity = text.includes('Begum Rokeya University');
-    const isAssignment = text === 'Assignment';
-    const isTopic = Boolean(topic) && (text === topic || text.includes('Assignment on'));
-    const isSession = text.startsWith('Session:');
-    const isSubmissionLabel = text === 'Submitted by-' || text === 'Submitted to-';
-    const size = isUniversity ? '48' : isAssignment ? '36' : isTopic ? '32' : '24';
-    const color = isTopic ? '8DB4E2' : undefined;
-    const runs = Array.from(paragraph.getElementsByTagNameNS(wordNamespace, 'r'));
-
-    runs.forEach((run) => {
-      const runText = Array.from(run.getElementsByTagNameNS(wordNamespace, 't')).map((node) => node.textContent ?? '').join('');
-      const runIsSessionLabel = isSession && runText.includes('Session:');
-      const bold = isUniversity || isAssignment || isTopic || isSubmissionLabel || runIsSessionLabel;
-      setDocxRunFormatting(run, size, bold, color);
-    });
-  });
-  return new XMLSerializer().serializeToString(document);
-}
-
 function loadImageDataUrl(source: string) {
   return new Promise<string>((resolve, reject) => {
     const image = new Image();
@@ -1039,55 +1218,6 @@ async function createModernPdf(form: FormState) {
 
   pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
   return pdf.output('blob');
-}
-
-function docxTemplateUrl(form: FormState) {
-  if (form.assignmentType === 'group') return groupTemplateUrl;
-  return form.design === 'simple' ? simpleTemplateUrl : form.design === 'modern' ? modernTemplateUrl : professionalTemplateUrl;
-}
-
-async function createDocx(form: FormState) {
-  const response = await fetch(docxTemplateUrl(form));
-  if (!response.ok) throw new Error(`Unable to load the ${form.design} DOCX template.`);
-  const zip = await JSZip.loadAsync(await response.arrayBuffer());
-  const documentFile = zip.file('word/document.xml');
-  if (!documentFile) throw new Error('The DOCX template is missing its document body.');
-  const templateXml = await documentFile.async('text');
-  const members = form.groupMembers.filter(Boolean);
-  const replacements = [
-    { source: 'Assignment on Bipolar transistor and Field Effect transistor', target: form.topic || 'Assignment topic' },
-    { source: 'Electrical and Electronic Engineering', target: form.courseTitle || 'Course title' },
-    { source: 'EEE 1211', target: form.courseCode || 'Course code' },
-    { source: '2024-25', target: form.session || 'Session' },
-    { source: 'Tamima Jannat Lisa', target: form.studentName || 'Name' },
-    { source: '12405003', target: form.studentId || 'ID' },
-    { source: '000019886', target: form.registrationNo || 'Registration no' },
-    { source: 'Md. Faruk Hosen', target: form.teacherName || 'Teacher name' },
-    { source: 'Lecturer', target: form.teacherDesignation || 'Designation' },
-    { source: 'Department of Computer Science & Engineering', target: form.teacherDepartment || 'Department', all: true },
-    { source: 'Department of Computer Science Engineering', target: form.teacherDepartment || 'Department', all: true },
-    { source: 'Begum Rokeya University', target: form.university || 'University', all: true },
-    { source: '10 September 2026', target: form.date || 'Date of submission' },
-    { source: 'Assignment', target: form.assignment || 'Assignment' },
-  ].map((replacement) => ({ ...replacement, all: true }));
-  if (form.assignmentType === 'group') {
-    replacements.push(
-      { source: 'Md AL Fahim Fuyad', target: members[0] || '', all: true },
-      { source: '2023-1-60-066', target: members[0] ? form.studentId || '' : '', all: true },
-      { source: 'Toyabur Rhaman', target: members[1] || '', all: true },
-      { source: '2023-1-60-065', target: members[1] ? form.studentId || '' : '', all: true },
-      { source: 'Shihab Mahmud Khan', target: members[2] || '', all: true },
-      { source: '2023- 1 -60-0 21', target: members[2] ? form.studentId || '' : '', all: true },
-      { source: '2023-1-60-021', target: members[2] ? form.studentId || '' : '', all: true },
-      { source: 'GROUP: #', target: `GROUP: ${members.length || '#'}`, all: true },
-    );
-  }
-  const replacedXml = replaceDocxText(templateXml, replacements);
-  zip.file('word/document.xml', applySimpleDocxTypography(replacedXml, form.topic || 'Assignment topic'));
-  return zip.generateAsync({
-    type: 'blob',
-    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  });
 }
 
 function coverHtml(form: FormState) {
