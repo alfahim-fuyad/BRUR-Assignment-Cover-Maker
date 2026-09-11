@@ -139,11 +139,12 @@ function CoverPreview({ form }: { form: FormState }) {
       <p className="docx-course">Course Code: {form.courseCode || 'Course code'}</p>
       <p className="docx-topic" data-testid="text-preview-topic">{form.topic || 'Assignment topic'}</p>
       <div className="docx-submission">
-        <p><strong>Submitted by:</strong> {group ? <span className="docx-group-label">GROUP: {members.length ? members.length : '#'}</span> : form.studentName || 'Name'}</p>
-        {group ? members.map((member, index) => <p key={`preview-member-${index}`}>{member || `Member ${index + 1}`}</p>) : <><p><strong>ID:</strong> {form.studentId || 'ID'}</p><p><strong>Registration No:</strong> {form.registrationNo || 'Registration no'}</p></>}
+        <p><strong>Submitted by-</strong></p>
+        {group ? members.map((member, index) => <p key={`preview-member-${index}`}>{member || `Member ${index + 1}`}</p>) : <><p>{form.studentName || 'Name'}</p><p><strong>ID:</strong> {form.studentId || 'ID'}</p><p><strong>Registration no:</strong> {form.registrationNo || 'Registration no'}</p></>}
       </div>
       <div className="docx-submitted-to">
-        <p><strong>Submitted to:</strong> {form.teacherName || 'Teacher name'}</p>
+        <p><strong>Submitted to-</strong></p>
+        <p>{form.teacherName || 'Teacher name'}</p>
         <p>{form.teacherDesignation || 'Designation'}</p>
         <p>{form.teacherDepartment || 'Department'}</p>
         <p>{form.university || 'University'}</p>
@@ -250,7 +251,7 @@ function Home() {
 
 function coverText(form: FormState) {
   const members = form.groupMembers.filter(Boolean);
-  return `${form.university || 'BEGUM ROKEYA UNIVERSITY'}\n\n${form.assignment || 'ASSIGNMENT'}\n\n${form.topic || 'Untitled assignment'}\n\nCourse title: ${form.courseTitle}\nCourse code: ${form.courseCode}\nDepartment: ${form.department}\nSession: ${form.session}\n\nSubmitted by: ${form.studentName}\nID: ${form.studentId}\nRegistration No: ${form.registrationNo}\n${members.length ? `\nGroup members:\n${members.map((member, index) => `Member ${index + 1}: ${member}`).join('\n')}\n` : ''}\nSubmitted to: ${form.teacherName}\n${form.teacherDesignation}\n${form.teacherDepartment}\n${form.university}\nDate of submission: ${form.date}`;
+  return `${form.university || 'BEGUM ROKEYA UNIVERSITY'}\n\n${form.assignment || 'ASSIGNMENT'}\n\n${form.topic || 'Untitled assignment'}\n\nCourse title: ${form.courseTitle}\nCourse code: ${form.courseCode}\nDepartment: ${form.department}\nSession: ${form.session}\n\nSubmitted by-\n${form.studentName}\nID: ${form.studentId}\nRegistration no: ${form.registrationNo}\n${members.length ? `\nGroup members:\n${members.map((member, index) => `Member ${index + 1}: ${member}`).join('\n')}\n` : ''}\nSubmitted to-\n${form.teacherName}\n${form.teacherDesignation}\n${form.teacherDepartment}\n${form.university}\nDate of submission: ${form.date}`;
 }
 
 const wordNamespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
@@ -484,7 +485,7 @@ async function createPdf(form: FormState) {
   // Vertical cursor in preview pixels; margins mirror the .docx-* CSS. Percentage margins
   // resolve against the containing block width: 8% of 440px = 35.2px for block gaps, and
   // the 1.2% paragraph gap of 369.6px = 4.44px inside the submission blocks.
-  const margin = { small: 13.2, tiny: 6.6, large: 44, medium: 15.4, topic: 39.6, block: 35.2, date: 30.8, paragraph: 4.4352 };
+  const margin = { small: 13.2, tiny: 6.6, large: 44, medium: 15.4, topic: 39.6, block: 35.2, date: 66, paragraph: 4.4352 };
   let top = 110.8; // bottom edge of the 62px logo box (top at 48.8px)
 
   top += margin.small;
@@ -526,7 +527,7 @@ async function createPdf(form: FormState) {
   const members = isGroup ? form.groupMembers.filter(Boolean) : [];
 
   top += margin.block;
-  top += advance(11, blockLine([{ text: 'Submitted by:', bold: true }, { text: isGroup ? `GROUP: ${members.length || '#'}` : form.studentName || 'Name', bold: false }], top));
+  top += advance(11, blockLine([{ text: 'Submitted by-', bold: true }], top));
   if (isGroup) {
     members.forEach((member, index) => {
       top += margin.paragraph;
@@ -534,13 +535,17 @@ async function createPdf(form: FormState) {
     });
   } else {
     top += margin.paragraph;
+    top += advance(11, blockLine([{ text: form.studentName || 'Name', bold: false }], top));
+    top += margin.paragraph;
     top += advance(11, blockLine([{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], top));
     top += margin.paragraph;
-    top += advance(11, blockLine([{ text: 'Registration No:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }], top));
+    top += advance(11, blockLine([{ text: 'Registration no:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }], top));
   }
 
   top += margin.block; // adjacent block margins collapse in CSS: max(1.2%, 8%) = 8%
-  top += advance(11, blockLine([{ text: 'Submitted to:', bold: true }, { text: form.teacherName || 'Teacher name', bold: false }], top));
+  top += advance(11, blockLine([{ text: 'Submitted to-', bold: true }], top));
+  top += margin.paragraph;
+  top += advance(11, blockLine([{ text: form.teacherName || 'Teacher name', bold: false }], top));
   top += margin.paragraph;
   top += advance(11, blockLine([{ text: form.teacherDesignation || 'Designation', bold: false }], top));
   top += margin.paragraph;
@@ -548,7 +553,7 @@ async function createPdf(form: FormState) {
   top += margin.paragraph;
   top += advance(11, blockLine([{ text: form.university || 'University', bold: false }], top));
 
-  top += margin.date; // max(1.2%, 7%) = 7%
+  top += margin.date; // .docx-date margin-top: 15% of 440px = 66px
   drawSegments([{ text: 'Date of submission:', bold: true }, { text: form.date || 'Date', bold: false }], top, 13, { align: 'center' });
 
   pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
@@ -608,7 +613,7 @@ function coverHtml(form: FormState) {
   const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char] ?? char);
   const members = form.groupMembers.filter(Boolean);
   const memberMarkup = members.length ? `<p><strong>Group members:</strong><br>${members.map((member, index) => `Member ${index + 1}: ${escape(member)}`).join('<br>')}</p>` : '';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${escape(form.topic || 'BRUR assignment cover')}</title><style>@page{size:A4;margin:0}body{font-family:"Times New Roman",Times,serif;color:#111;margin:0}.cover{box-sizing:border-box;width:210mm;min-height:297mm;margin:auto;padding:24mm 25mm;text-align:center;border-top:2mm solid #1a8d7f}.logo{width:24mm;height:24mm;object-fit:contain;margin:0 auto 7mm}.university{font-size:24pt;font-weight:700;margin:0 0 5mm}.department{font-size:16pt;margin:0 0 20mm}.assignment{font-size:18pt;font-weight:700;margin:0 0 12mm}.meta{font-size:12pt;margin:0 0 4mm}.topic{display:inline-block;max-width:170mm;margin:10mm auto 0;padding:3mm 6mm;color:#2563eb;background:#eff6ff;font-size:16pt;font-weight:700}.details{width:160mm;margin:24mm auto 0;text-align:left;font-size:12pt;line-height:1.5}.details p{margin:0 0 8mm}.details strong{font-weight:700}.value{font-weight:400}.date{font-size:12pt;margin-top:12mm;text-align:center}</style></head><body><main class="cover"><img class="logo" src="${logoPath}" alt="BRUR logo"><p class="university">${escape(form.university || 'BEGUM ROKEYA UNIVERSITY')}</p><p class="department">${escape(form.department || form.teacherDepartment || 'Department')}</p><p class="assignment">${escape(form.assignment || 'ASSIGNMENT')}</p><p class="meta"><span>Course Code: </span><span class="value">${escape(form.courseCode)}</span></p><p class="meta"><span>Course Title: </span><span class="value">${escape(form.courseTitle)}</span></p><p class="meta"><strong>Session:</strong> <span class="value">${escape(form.session)}</span></p><p class="topic">${escape(form.topic || 'Untitled assignment')}</p><section class="details"><p><strong>Submitted by:</strong> <span class="value">${escape(form.studentName)}</span><br><strong>ID:</strong> <span class="value">${escape(form.studentId)}</span><br><strong>Registration No:</strong> <span class="value">${escape(form.registrationNo)}</span></p>${memberMarkup}<p><strong>Submitted to:</strong> <span class="value">${escape(form.teacherName)}</span><br><span class="value">${escape(form.teacherDesignation)}<br>${escape(form.teacherDepartment)}<br>${escape(form.university)}</span></p><p class="date"><strong>Date of submission:</strong> <span class="value">${escape(form.date)}</span></p></section></main></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escape(form.topic || 'BRUR assignment cover')}</title><style>@page{size:A4;margin:0}body{font-family:"Times New Roman",Times,serif;color:#111;margin:0}.cover{box-sizing:border-box;width:210mm;min-height:297mm;margin:auto;padding:24mm 25mm;text-align:center;border-top:2mm solid #1a8d7f}.logo{width:24mm;height:24mm;object-fit:contain;margin:0 auto 7mm}.university{font-size:24pt;font-weight:700;margin:0 0 5mm}.department{font-size:16pt;margin:0 0 20mm}.assignment{font-size:18pt;font-weight:700;margin:0 0 12mm}.meta{font-size:12pt;margin:0 0 4mm}.topic{display:inline-block;max-width:170mm;margin:10mm auto 0;padding:3mm 6mm;color:#2563eb;background:#eff6ff;font-size:16pt;font-weight:700}.details{width:160mm;margin:24mm auto 0;text-align:left;font-size:12pt;line-height:1.5}.details p{margin:0 0 8mm}.details strong{font-weight:700}.value{font-weight:400}.date{font-size:12pt;margin-top:30mm;text-align:center}</style></head><body><main class="cover"><img class="logo" src="${logoPath}" alt="BRUR logo"><p class="university">${escape(form.university || 'BEGUM ROKEYA UNIVERSITY')}</p><p class="department">${escape(form.department || form.teacherDepartment || 'Department')}</p><p class="assignment">${escape(form.assignment || 'ASSIGNMENT')}</p><p class="meta"><span>Course Code: </span><span class="value">${escape(form.courseCode)}</span></p><p class="meta"><span>Course Title: </span><span class="value">${escape(form.courseTitle)}</span></p><p class="meta"><strong>Session:</strong> <span class="value">${escape(form.session)}</span></p><p class="topic">${escape(form.topic || 'Untitled assignment')}</p><section class="details"><p><strong>Submitted by-</strong><br><span class="value">${escape(form.studentName)}</span><br><strong>ID:</strong> <span class="value">${escape(form.studentId)}</span><br><strong>Registration no:</strong> <span class="value">${escape(form.registrationNo)}</span></p>${memberMarkup}<p><strong>Submitted to-</strong><br><span class="value">${escape(form.teacherName)}<br>${escape(form.teacherDesignation)}<br>${escape(form.teacherDepartment)}<br>${escape(form.university)}</span></p><p class="date"><strong>Date of submission:</strong> <span class="value">${escape(form.date)}</span></p></section></main></body></html>`;
 }
 
 function Router() {
