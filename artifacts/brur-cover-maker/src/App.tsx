@@ -152,16 +152,14 @@ function CoverPreview({ form }: { form: FormState }) {
   );
 }
 
-// Modern design: bold full-bleed navy banner with soft geometric orbs and a
-// coral accent system, a white crest chip, hero topic typography, teal-labeled
-// meta lines and tinted "Submitted By / Submitted To" cards. All spacing
-// mirrors createModernPdf() so the PDF stays a 1:1 print.
+// Modern design: bold full-bleed navy banner with a coral accent system, a
+// white crest chip, hero topic typography, teal-labeled meta lines and tinted
+// "Submitted By / Submitted To" cards. All spacing mirrors createModernPdf()
+// so the PDF stays a 1:1 print.
 function ModernCover({ form, group, members }: { form: FormState; group: boolean; members: string[] }) {
   return (
     <div className="cover-paper docx-cover docx-mc" data-testid="modern-cover">
       <div className="mc-band">
-        <span className="mc-orb mc-orb-a" aria-hidden="true" />
-        <span className="mc-orb mc-orb-b" aria-hidden="true" />
         <span className="mc-strip" aria-hidden="true" />
         <img className="mc-chip-logo" src={logoPath} alt="BRUR crest" data-testid="img-preview-logo" />
         <p className="mc-university">{(form.university || 'Begum Rokeya University').toUpperCase()}</p>
@@ -686,7 +684,6 @@ const PDF_BAND: [number, number, number] = [248, 251, 252]; // #f8fbfc — topic
 // Modern design palette (mirrors the .mc-* styles in index.css).
 const PDF_WHITE: [number, number, number] = [255, 255, 255];
 const PDF_MC_MIST: [number, number, number] = [207, 227, 234]; // #cfe3ea — banner department ink
-const PDF_MC_ORB: [number, number, number] = [29, 92, 112]; // #1d5c70 — banner orb
 const PDF_MC_CORAL: [number, number, number] = [229, 107, 81]; // #e56b51 — coral accent
 const PDF_MC_TEAL: [number, number, number] = [26, 141, 127]; // #1a8d7f — teal label ink
 const PDF_MC_TEAL_BRIGHT: [number, number, number] = [26, 155, 134]; // #1a9b86 — BY rule
@@ -1051,13 +1048,11 @@ async function createModernPdf(form: FormState) {
   pdf.setFillColor(255, 255, 255);
   pdf.rect(0, 0, 210, 297, 'F');
 
-  // Full-bleed navy banner, soft geometric orb accents and the coral base strip.
+  // Full-bleed navy banner and the coral base strip (decorative circles were
+  // removed for a cleaner, distraction-free cover).
   pdf.setFillColor(PDF_NAVY[0], PDF_NAVY[1], PDF_NAVY[2]);
   pdf.rect(0, 0, 210, px(196), 'F');
-  pdf.setFillColor(PDF_MC_ORB[0], PDF_MC_ORB[1], PDF_MC_ORB[2]);
-  pdf.circle(px(490), px(10), px(85), 'F');
   pdf.setFillColor(PDF_MC_CORAL[0], PDF_MC_CORAL[1], PDF_MC_CORAL[2]);
-  pdf.circle(px(33), px(175), px(7), 'F');
   pdf.rect(0, px(196), 210, px(4), 'F');
 
   // Crest chip: white rounded square with the BRUR crest inset.
