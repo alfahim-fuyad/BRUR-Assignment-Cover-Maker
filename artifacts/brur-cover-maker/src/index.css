@@ -121,20 +121,24 @@
 .mesh-bg { background-image: radial-gradient(circle at 15% 15%, rgba(32, 177, 153, .11), transparent 27%), radial-gradient(circle at 92% 10%, rgba(226, 89, 65, .08), transparent 25%); }
 .paper-shadow { box-shadow: 0 18px 44px rgba(22, 55, 70, .16), 0 2px 6px rgba(22, 55, 70, .08); }
 .preview-frame { @apply mx-auto max-w-[650px] rounded-[1.25rem] bg-[#dfe9e9] p-4 shadow-[0_12px_34px_rgba(22,55,70,0.08)] sm:p-7; }
-.cover-paper { @apply relative mx-auto aspect-[1/1.414] w-full max-w-[520px] overflow-hidden bg-white; box-shadow: 0 18px 44px rgba(22, 55, 70, .16), 0 2px 6px rgba(22, 55, 70, .08); }
+.cover-paper { @apply relative mx-auto aspect-[1/1.414] w-full max-w-[520px] overflow-hidden bg-white; container-type: inline-size; box-shadow: 0 18px 44px rgba(22, 55, 70, .16), 0 2px 6px rgba(22, 55, 70, .08); }
+/* Everything inside the cover is proportional to the cover's content width (container
+   query units) so the A4 sheet scales like a real page thumbnail at every breakpoint.
+   The px declarations above each cqw value are fallbacks for older browsers, and the
+   cqw values resolve to the exact same px at the desktop 520px cover (440px content box). */
 .docx-cover { font-family: "Times New Roman", Times, serif; color: #111; line-height: 1.15; }
-.docx-logo { width: 62px; height: 62px; margin-top: 2%; }
-.docx-university { margin-top: 3%; font-size: clamp(16px, 4vw, 21px); font-weight: 700; }
-.docx-department { margin-top: 1.5%; font-size: clamp(11px, 2.65vw, 14px); }
-.docx-assignment { margin-top: 10%; font-size: clamp(13px, 3.05vw, 16px); font-weight: 700; }
-.docx-session, .docx-course { margin-top: 3.5%; font-size: clamp(9px, 2vw, 11px); }
+.docx-logo { width: 62px; width: 14.0909cqw; height: 62px; height: 14.0909cqw; margin-top: 2%; }
+.docx-university { margin-top: 3%; font-size: 21px; font-size: 4.7727cqw; font-weight: 700; }
+.docx-department { margin-top: 1.5%; font-size: 14px; font-size: 3.1818cqw; }
+.docx-assignment { margin-top: 10%; font-size: 16px; font-size: 3.6364cqw; font-weight: 700; }
+.docx-session, .docx-course { margin-top: 3.5%; font-size: 11px; font-size: 2.5cqw; }
 .docx-session strong, .docx-submission strong, .docx-submitted-to strong, .docx-date strong { font-weight: 700; }
-.docx-topic { margin: 9% auto 0; max-width: 84%; padding: 1.5% 3%; color: #2563eb; background: #eff6ff; font-size: clamp(12px, 2.65vw, 14px); font-weight: 700; }
-.docx-submission, .docx-submitted-to { margin: 8% auto 0; width: 84%; text-align: left; font-size: clamp(9px, 2vw, 11px); }
+.docx-topic { margin: 9% auto 0; max-width: 84%; padding: 1.5% 3%; color: #2563eb; background: #eff6ff; font-size: 14px; font-size: 3.1818cqw; font-weight: 700; }
+.docx-submission, .docx-submitted-to { margin: 8% auto 0; width: 84%; text-align: left; font-size: 11px; font-size: 2.5cqw; }
 .docx-submission p, .docx-submitted-to p { margin: 0 0 1.2%; }
 .docx-group-label { float: right; }
 .docx-submitted-to { margin-top: 8%; }
-.docx-date { margin-top: 15%; font-size: clamp(8px, 1.55vw, 13px); }
+.docx-date { margin-top: 15%; font-size: 13px; font-size: 2.9545cqw; }
 .docx-professional .docx-logo { margin-top: 0; }
 .docx-professional .docx-assignment { margin-top: 8%; }
 .docx-modern { aspect-ratio: 11910 / 16845; }
