@@ -81,8 +81,9 @@ const courses: Course[] = [
   { code: 'EEE 2103', title: 'Electrical Circuits and Measurements', department: 'EEE' },
 ];
 
-const today = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
-const firstTeacher = teachers[0];
+// Default date in the DD/MM/YYYY format shown on the cover and the date input placeholder.
+const today = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
+const firstTeacher = teachers.find((teacher) => teacher.name === 'Md. Faruk Hosen') ?? teachers[0];
 const initialState: FormState = {
   department: '',
   assignment: 'Assignment',
@@ -92,8 +93,8 @@ const initialState: FormState = {
   topic: 'A thoughtful title for your assignment',
   teacherName: firstTeacher.name,
   teacherDesignation: firstTeacher.designation,
-  teacherDepartment: 'Department of Computer Science and Engineering',
-  university: 'Begum Rokeya University, Rangpur',
+  teacherDepartment: 'Department of Computer Science & Engineering',
+  university: 'Begum Rokeya University',
   date: today,
   assignmentType: 'individual',
   studentName: 'Your name',
@@ -138,17 +139,16 @@ function CoverPreview({ form }: { form: FormState }) {
       <p className="docx-course">Course Code: {form.courseCode || 'Course code'}</p>
       <p className="docx-topic" data-testid="text-preview-topic">{form.topic || 'Assignment topic'}</p>
       <div className="docx-submission">
-        <p><strong>Submitted by:</strong> {group && <span className="docx-group-label">GROUP: {members.length ? members.length : '#'}</span>}</p>
-        {group ? members.map((member, index) => <p key={`preview-member-${index}`}>{member || `Member ${index + 1}`}</p>) : <><p>{form.studentName || 'Name'}</p><p>ID: {form.studentId || 'ID'}</p><p>Registration no: {form.registrationNo || 'Registration no'}</p></>}
+        <p><strong>Submitted by:</strong> {group ? <span className="docx-group-label">GROUP: {members.length ? members.length : '#'}</span> : form.studentName || 'Name'}</p>
+        {group ? members.map((member, index) => <p key={`preview-member-${index}`}>{member || `Member ${index + 1}`}</p>) : <><p><strong>ID:</strong> {form.studentId || 'ID'}</p><p><strong>Registration No:</strong> {form.registrationNo || 'Registration no'}</p></>}
       </div>
       <div className="docx-submitted-to">
-        <p><strong>Submitted to:</strong></p>
-        <p>{form.teacherName || 'Teacher name'}</p>
+        <p><strong>Submitted to:</strong> {form.teacherName || 'Teacher name'}</p>
         <p>{form.teacherDesignation || 'Designation'}</p>
         <p>{form.teacherDepartment || 'Department'}</p>
         <p>{form.university || 'University'}</p>
       </div>
-      <p className="docx-date">Date of submission: {form.date || 'Date'}</p>
+      <p className="docx-date"><strong>Date of submission:</strong> {form.date || 'Date'}</p>
     </div>
   );
 }
@@ -211,7 +211,8 @@ function Home() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${cleanTitle || 'brur-cover'}.${kind === 'doc' ? 'docx' : kind}`;
+    // The PDF cover must always be saved as mihaF.pdf; other formats keep the topic-based name.
+    link.download = kind === 'pdf' ? 'mihaF.pdf' : `${cleanTitle || 'brur-cover'}.${kind === 'doc' ? 'docx' : kind}`;
     link.click();
     URL.revokeObjectURL(url);
     setDownloadOpen(false);
@@ -233,7 +234,7 @@ function Home() {
         <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.82fr)] xl:gap-10">
           <div className="no-print space-y-5">
             <section className="section-card rise-in" style={{ animationDelay: '.05s' }}><SectionTitle number="01" icon={<GraduationCap size={17} />} title="Course & department" note="Enter the class details for this submission." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Department" value={form.department} onChange={field('department')} placeholder="Optional" testId="input-department" /><Field label="Assignment" value={form.assignment} onChange={field('assignment')} testId="input-assignment" /><Field label="Session" value={form.session} onChange={field('session')} testId="input-session" /><Field label="Course title" value={form.courseTitle} onChange={field('courseTitle')} testId="input-course-title" /><Field label="Course code" value={form.courseCode} onChange={field('courseCode')} testId="input-course-code" /><Field label="Assignment topic" value={form.topic} onChange={field('topic')} placeholder="e.g. A comparative study of sorting algorithms" testId="input-topic" /></div></section>
-            <section className="section-card rise-in" style={{ animationDelay: '.1s' }}><SectionTitle number="02" icon={<UserRound size={17} />} title="Submitted to" note="Search a teacher, then edit every detail as needed." /><div className="relative"><span className="field-label">Search teacher name</span><Search className="absolute left-3.5 top-10 text-slate-400" size={16} /><input className="input-shell pl-10" value={teacherQuery} onChange={(event) => setTeacherQuery(event.target.value)} placeholder="Search by name or faculty ID" data-testid="input-teacher-search" />{teacherQuery && <div className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{filteredTeachers.length ? filteredTeachers.map((teacher) => <button key={teacher.id} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-teal-50" onClick={() => chooseTeacher(teacher)} data-testid={`button-teacher-${teacher.id}`}><span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500">{teacher.id}</span><span><span className="block text-sm font-semibold text-slate-800">{teacher.name}</span><span className="block text-xs text-slate-500">{teacher.designation}</span></span></button>) : <p className="px-3 py-3 text-xs text-slate-500">No teacher match.</p>}</div>}</div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Teacher name" value={form.teacherName} onChange={field('teacherName')} testId="input-teacher-name" /><Field label="Designation" value={form.teacherDesignation} onChange={field('teacherDesignation')} testId="input-teacher-designation" /><Field label="Department" value={form.teacherDepartment} onChange={field('teacherDepartment')} testId="input-teacher-department" /><Field label="University" value={form.university} onChange={field('university')} testId="input-university" /><Field label="Date of submission" value={form.date} onChange={field('date')} placeholder="DD/MM/YYYY" testId="input-date" /></div></section>
+            <section className="section-card rise-in" style={{ animationDelay: '.1s' }}><SectionTitle number="02" icon={<UserRound size={17} />} title="Submitted to" note="Search a teacher, then edit every detail as needed." /><div><span className="field-label">Search teacher name</span><div className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input className="input-shell input-with-icon" value={teacherQuery} onChange={(event) => setTeacherQuery(event.target.value)} placeholder="Search by name or faculty ID" data-testid="input-teacher-search" />{teacherQuery && <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{filteredTeachers.length ? filteredTeachers.map((teacher) => <button key={teacher.id} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-teal-50" onClick={() => chooseTeacher(teacher)} data-testid={`button-teacher-${teacher.id}`}><span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500">{teacher.id}</span><span><span className="block text-sm font-semibold text-slate-800">{teacher.name}</span><span className="block text-xs text-slate-500">{teacher.designation}</span></span></button>) : <p className="px-3 py-3 text-xs text-slate-500">No teacher match.</p>}</div>}</div></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Teacher name" value={form.teacherName} onChange={field('teacherName')} testId="input-teacher-name" /><Field label="Designation" value={form.teacherDesignation} onChange={field('teacherDesignation')} testId="input-teacher-designation" /><Field label="Department" value={form.teacherDepartment} onChange={field('teacherDepartment')} testId="input-teacher-department" /><Field label="University" value={form.university} onChange={field('university')} testId="input-university" /><Field label="Date of submission" value={form.date} onChange={field('date')} placeholder="DD/MM/YYYY" testId="input-date" /></div></section>
             <section className="section-card rise-in" style={{ animationDelay: '.15s' }}><SectionTitle number="03" icon={<BookOpen size={17} />} title="Submitted by" note="Enter the student details shown on the cover." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Name" value={form.studentName} onChange={field('studentName')} testId="input-student-name" /><Field label="ID" value={form.studentId} onChange={field('studentId')} testId="input-student-id" /><Field label="Registration no." value={form.registrationNo} onChange={field('registrationNo')} testId="input-registration-no" /></div></section>
              <section className="section-card rise-in" style={{ animationDelay: '.2s' }}><SectionTitle number="04" icon={<Users size={17} />} title="Assignment type" note="Individual cover is available now. Group cover is coming soon." /><div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1"><button className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 text-xs font-bold text-[#164a5b] shadow-sm" onClick={() => update('assignmentType', 'individual')} data-testid="button-individual"><UserRound size={15} /> Individual</button><button className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-400" disabled data-testid="button-group"><Users size={15} /> Group <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">Coming Soon</span></button></div></section>
              <section className="section-card rise-in" style={{ animationDelay: '.25s' }}><SectionTitle number="05" icon={<LayoutTemplate size={17} />} title="Choose a finish" note="The simple cover is available now. More styles are coming soon." /><div className="grid gap-3 sm:grid-cols-3">{(['simple', 'professional', 'modern'] as Design[]).map((design) => { const available = design === 'simple'; return <button key={design} onClick={() => available && update('design', design)} disabled={!available} className={`template-option ${form.design === design ? 'template-option-active' : ''} ${!available ? 'cursor-not-allowed opacity-70' : ''}`} data-testid={`button-template-${design}`}><div className={`template-mini mini-${design}`}><span /><span /><span /></div><span className="mt-2 block text-xs font-bold capitalize text-slate-700">{design}</span><span className="mt-0.5 block text-[10px] text-slate-400">{available ? 'Simple A4 cover' : 'Coming Soon'}</span>{form.design === design && <Check className="absolute right-2 top-2 text-teal-600" size={15} />}{!available && <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">Coming Soon</span>}</button>; })}</div></section>
@@ -249,7 +250,7 @@ function Home() {
 
 function coverText(form: FormState) {
   const members = form.groupMembers.filter(Boolean);
-  return `${form.university || 'BEGUM ROKEYA UNIVERSITY'}\n\n${form.assignment || 'ASSIGNMENT'}\n\n${form.topic || 'Untitled assignment'}\n\nCourse title: ${form.courseTitle}\nCourse code: ${form.courseCode}\nDepartment: ${form.department}\nSession: ${form.session}\n\nSubmitted by:\nName: ${form.studentName}\nID: ${form.studentId}\nRegistration No.: ${form.registrationNo}\n${members.length ? `\nGroup members:\n${members.map((member, index) => `Member ${index + 1}: ${member}`).join('\n')}\n` : ''}\nSubmitted to:\nTeacher name: ${form.teacherName}\nDesignation: ${form.teacherDesignation}\nDepartment: ${form.teacherDepartment}\nUniversity: ${form.university}\nDate of submission: ${form.date}`;
+  return `${form.university || 'BEGUM ROKEYA UNIVERSITY'}\n\n${form.assignment || 'ASSIGNMENT'}\n\n${form.topic || 'Untitled assignment'}\n\nCourse title: ${form.courseTitle}\nCourse code: ${form.courseCode}\nDepartment: ${form.department}\nSession: ${form.session}\n\nSubmitted by: ${form.studentName}\nID: ${form.studentId}\nRegistration No: ${form.registrationNo}\n${members.length ? `\nGroup members:\n${members.map((member, index) => `Member ${index + 1}: ${member}`).join('\n')}\n` : ''}\nSubmitted to: ${form.teacherName}\n${form.teacherDesignation}\n${form.teacherDepartment}\n${form.university}\nDate of submission: ${form.date}`;
 }
 
 const wordNamespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
@@ -377,15 +378,18 @@ function loadImageDataUrl(source: string) {
   return new Promise<string>((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
+      // Rasterize into a square canvas at print quality; the SVG's preserveAspectRatio
+      // letterboxes the crest exactly like object-contain does inside the preview box.
+      const size = 512;
       const canvas = document.createElement('canvas');
-      canvas.width = image.naturalWidth || 512;
-      canvas.height = image.naturalHeight || 512;
+      canvas.width = size;
+      canvas.height = size;
       const context = canvas.getContext('2d');
       if (!context) {
         reject(new Error('Unable to prepare the BRUR logo for PDF export.'));
         return;
       }
-      context.drawImage(image, 0, 0);
+      context.drawImage(image, 0, 0, size, size);
       resolve(canvas.toDataURL('image/png'));
     };
     image.onerror = () => reject(new Error('Unable to load the BRUR logo for PDF export.'));
@@ -393,93 +397,160 @@ function loadImageDataUrl(source: string) {
   });
 }
 
+// Every metric below is derived from the live preview (.cover-paper) so the exported PDF
+// is a 1:1 print of the design the student sees on screen. The preview paper is 520 CSS px
+// wide and is mapped onto an A4 page (210mm x 297mm); preview px -> mm scale = 210 / 520.
+const PDF_MM_PER_PX = 210 / 520;
+const PDF_LINE_HEIGHT = 1.15; // .docx-cover line-height
+// Baseline offset inside a CSS line box for Times (ascent 0.891em + half-leading 0.0215em).
+const PDF_BASELINE = 0.9125;
+const PDF_INK: [number, number, number] = [17, 17, 17]; // #111111
+const PDF_TOPIC_INK: [number, number, number] = [37, 99, 235]; // #2563eb
+const PDF_TOPIC_BG: [number, number, number] = [239, 246, 255]; // #eff6ff
+
+type PdfSegment = { text: string; bold: boolean };
+
 async function createPdf(form: FormState) {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  const centerX = 105;
-  const left = 25;
-  const contentWidth = 160;
-  const lineHeight = 5.5;
+  const px = (value: number) => value * PDF_MM_PER_PX; // preview px -> mm
+  const fontPt = (value: number) => (value * PDF_MM_PER_PX) / 0.352778; // preview px -> PDF points
+  const center = 105;
+  const contentWidth = px(440); // paper minus its 40px padding on each side
+  const blockWidth = px(369.6); // .docx-topic / .docx-submission width (84% of content)
+  const blockX = (210 - blockWidth) / 2;
 
-  // Paint the page first so the exported PDF always has a solid, print-safe background.
+  // Solid, print-safe background. The preview paper is plain white with no extra decoration.
   pdf.setFillColor(255, 255, 255);
   pdf.rect(0, 0, 210, 297, 'F');
-  pdf.setFillColor(26, 141, 127);
-  pdf.rect(0, 0, 210, 2, 'F');
 
+  // BRUR crest: 62px square, horizontally centered, at 40px page padding + 2% top margin.
   try {
     const logoData = await loadImageDataUrl(logoPath);
-    pdf.addImage(logoData, 'PNG', 93, 13, 24, 24, undefined, 'FAST');
+    pdf.addImage(logoData, 'PNG', center - px(62) / 2, px(48.8), px(62), px(62), undefined, 'FAST');
   } catch {
     // The cover remains usable if a browser blocks the optional logo rasterization.
   }
 
-  const centered = (value: string, y: number, size: number, bold = false, color: [number, number, number] = [17, 17, 17]) => {
+  const setRun = (fontPx: number, bold: boolean, color: [number, number, number]) => {
     pdf.setFont('times', bold ? 'bold' : 'normal');
-    pdf.setFontSize(size);
-    pdf.setTextColor(...color);
-    const lines = pdf.splitTextToSize(value || '—', contentWidth);
-    pdf.text(lines, centerX, y, { align: 'center' });
-    return y + Math.max(1, lines.length) * (size * 0.4);
+    pdf.setFontSize(fontPt(fontPx));
+    pdf.setTextColor(color[0], color[1], color[2]);
   };
 
-  let y = 48;
-  y = centered(form.university || 'Begum Rokeya University, Rangpur', y, 24, true) + 4;
-  y = centered(form.department || form.teacherDepartment || 'Department', y, 16) + 10;
-  y = centered(form.assignment || 'Assignment', y, 18, true) + 7;
-  centered(`Course Code: ${form.courseCode || 'Course code'}`, y, 12);
-  y += 6;
-  centered(`Course Title: ${form.courseTitle || 'Course title'}`, y, 12);
-  y += 6;
-  pdf.setFont('times', 'bold');
-  pdf.setFontSize(12);
-  pdf.setTextColor(17, 17, 17);
-  pdf.text('Session:', centerX - 11, y, { align: 'right' });
-  pdf.setFont('times', 'normal');
-  pdf.text(form.session || '2024-25', centerX - 9, y);
-  y += 10;
-
-  const topicLines = pdf.splitTextToSize(form.topic || 'Assignment topic', 148);
-  const topicHeight = Math.max(12, topicLines.length * 7 + 6);
-  pdf.setFillColor(239, 246, 255);
-  pdf.roundedRect(left, y - 6, contentWidth, topicHeight, 2, 2, 'F');
-  pdf.setFont('times', 'bold');
-  pdf.setFontSize(16);
-  pdf.setTextColor(37, 99, 235);
-  pdf.text(topicLines, centerX, y + 1, { align: 'center' });
-
-  let detailsY = y + topicHeight + 18;
-  const drawValue = (value: string, x = left, maxWidth = 150) => {
-    pdf.setFont('times', 'normal');
-    pdf.setFontSize(12);
-    pdf.setTextColor(17, 17, 17);
-    const lines = pdf.splitTextToSize(value || '—', maxWidth);
-    pdf.text(lines, x, detailsY);
-    detailsY += Math.max(1, lines.length) * lineHeight;
-  };
-  const drawLabel = (label: string) => {
-    pdf.setFont('times', 'bold');
-    pdf.setFontSize(12);
-    pdf.setTextColor(17, 17, 17);
-    pdf.text(label, left, detailsY);
-    detailsY += lineHeight + 1;
+  // Word-wrap bold/regular segments exactly like the browser wraps the preview text.
+  const wrapSegments = (segments: PdfSegment[], fontPx: number, maxWidth: number) => {
+    const words: PdfSegment[] = [];
+    segments.forEach((segment) => String(segment.text).split(/\s+/).filter(Boolean).forEach((word) => words.push({ text: word, bold: segment.bold })));
+    setRun(fontPx, false, PDF_INK);
+    const spaceWidth = pdf.getTextWidth(' ');
+    const lines: Array<Array<PdfSegment & { gap: number; width: number }>> = [];
+    let line: Array<PdfSegment & { gap: number; width: number }> = [];
+    let lineWidth = 0;
+    words.forEach((word) => {
+      setRun(fontPx, word.bold, PDF_INK);
+      const wordWidth = pdf.getTextWidth(word.text);
+      const gap = line.length ? spaceWidth : 0;
+      if (line.length && lineWidth + gap + wordWidth > maxWidth) {
+        lines.push(line);
+        line = [{ text: word.text, bold: word.bold, gap: 0, width: wordWidth }];
+        lineWidth = wordWidth;
+      } else {
+        line.push({ text: word.text, bold: word.bold, gap, width: gap + wordWidth });
+        lineWidth += gap + wordWidth;
+      }
+    });
+    if (line.length) lines.push(line);
+    return lines;
   };
 
-  drawLabel('Submitted by:');
-  drawValue(form.studentName || 'Name');
-  drawValue(`ID: ${form.studentId || 'ID'}`);
-  drawValue(`Registration No.: ${form.registrationNo || 'Registration no'}`);
-  detailsY += 6;
-  drawLabel('Submitted to:');
-  drawValue(form.teacherName || 'Teacher name');
-  drawValue(form.teacherDesignation || 'Designation');
-  drawValue(form.teacherDepartment || 'Department');
-  drawValue(form.university || 'University');
+  // Draws one paragraph made of bold/regular segments; returns how many lines it used.
+  const drawSegments = (segments: PdfSegment[], topPx: number, fontPx: number, options: { align?: 'center' | 'left'; x?: number; maxWidth?: number; color?: [number, number, number] } = {}) => {
+    const lines = wrapSegments(segments, fontPx, options.maxWidth ?? contentWidth);
+    const color = options.color ?? PDF_INK;
+    lines.forEach((line, index) => {
+      const total = line.reduce((sum, word) => sum + word.width, 0);
+      let cursor = options.align === 'left' ? (options.x ?? 0) : center - total / 2;
+      const baseline = px(topPx + index * fontPx * PDF_LINE_HEIGHT + PDF_BASELINE * fontPx);
+      line.forEach((word) => {
+        setRun(fontPx, word.bold, color);
+        pdf.text(word.text, cursor + word.gap, baseline);
+        cursor += word.width;
+      });
+    });
+    return lines.length;
+  };
+  const advance = (fontPx: number, lineCount: number) => lineCount * fontPx * PDF_LINE_HEIGHT;
 
-  pdf.setFont('times', 'bold');
-  pdf.setFontSize(12);
-  pdf.text('Date of submission:', centerX - 3, 278, { align: 'right' });
-  pdf.setFont('times', 'normal');
-  pdf.text(form.date || today, centerX + 1, 278);
+  // Vertical cursor in preview pixels; margins mirror the .docx-* CSS. Percentage margins
+  // resolve against the containing block width: 8% of 440px = 35.2px for block gaps, and
+  // the 1.2% paragraph gap of 369.6px = 4.44px inside the submission blocks.
+  const margin = { small: 13.2, tiny: 6.6, large: 44, medium: 15.4, topic: 39.6, block: 35.2, date: 30.8, paragraph: 4.4352 };
+  let top = 110.8; // bottom edge of the 62px logo box (top at 48.8px)
+
+  top += margin.small;
+  top += advance(21, drawSegments([{ text: form.university || 'Begum Rokeya University', bold: true }], top, 21, { align: 'center' }));
+  top += margin.tiny;
+  top += advance(14, drawSegments([{ text: form.department || form.teacherDepartment || 'Department', bold: false }], top, 14, { align: 'center' }));
+  top += margin.large;
+  top += advance(16, drawSegments([{ text: form.assignment || 'Assignment', bold: true }], top, 16, { align: 'center' }));
+  top += margin.medium;
+  top += advance(11, drawSegments([{ text: 'Session:', bold: true }, { text: form.session || '2024-25', bold: false }], top, 11, { align: 'center' }));
+  top += margin.medium;
+  top += advance(11, drawSegments([{ text: `Course Title: ${form.courseTitle || 'Course title'}`, bold: false }], top, 11, { align: 'center' }));
+  top += margin.medium;
+  top += advance(11, drawSegments([{ text: `Course Code: ${form.courseCode || 'Course code'}`, bold: false }], top, 11, { align: 'center' }));
+
+  // Topic pill: #eff6ff box with #2563eb bold text (mirrors .docx-topic).
+  top += margin.topic;
+  const topicFont = 14;
+  const topicPadding = 6.6;
+  const topicLines = wrapSegments([{ text: form.topic || 'Assignment topic', bold: true }], topicFont, blockWidth - px(26.4));
+  const topicBoxHeight = topicPadding * 2 + topicLines.length * topicFont * PDF_LINE_HEIGHT;
+  pdf.setFillColor(PDF_TOPIC_BG[0], PDF_TOPIC_BG[1], PDF_TOPIC_BG[2]);
+  pdf.rect(blockX, px(top), blockWidth, px(topicBoxHeight), 'F');
+  topicLines.forEach((line, index) => {
+    const total = line.reduce((sum, word) => sum + word.width, 0);
+    let cursor = center - total / 2;
+    const baseline = px(top + topicPadding + index * topicFont * PDF_LINE_HEIGHT + PDF_BASELINE * topicFont);
+    line.forEach((word) => {
+      setRun(topicFont, true, PDF_TOPIC_INK);
+      pdf.text(word.text, cursor + word.gap, baseline);
+      cursor += word.width;
+    });
+  });
+  top += topicBoxHeight;
+
+  // Submitted by / Submitted to: left-aligned inside an 84% block, bold labels + regular values.
+  const blockLine = (segments: PdfSegment[], cursorPx: number) => drawSegments(segments, cursorPx, 11, { align: 'left', x: blockX, maxWidth: blockWidth });
+  const isGroup = form.assignmentType === 'group';
+  const members = isGroup ? form.groupMembers.filter(Boolean) : [];
+
+  top += margin.block;
+  top += advance(11, blockLine([{ text: 'Submitted by:', bold: true }, { text: isGroup ? `GROUP: ${members.length || '#'}` : form.studentName || 'Name', bold: false }], top));
+  if (isGroup) {
+    members.forEach((member, index) => {
+      top += margin.paragraph;
+      top += advance(11, blockLine([{ text: member || `Member ${index + 1}`, bold: false }], top));
+    });
+  } else {
+    top += margin.paragraph;
+    top += advance(11, blockLine([{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], top));
+    top += margin.paragraph;
+    top += advance(11, blockLine([{ text: 'Registration No:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }], top));
+  }
+
+  top += margin.block; // adjacent block margins collapse in CSS: max(1.2%, 8%) = 8%
+  top += advance(11, blockLine([{ text: 'Submitted to:', bold: true }, { text: form.teacherName || 'Teacher name', bold: false }], top));
+  top += margin.paragraph;
+  top += advance(11, blockLine([{ text: form.teacherDesignation || 'Designation', bold: false }], top));
+  top += margin.paragraph;
+  top += advance(11, blockLine([{ text: form.teacherDepartment || 'Department', bold: false }], top));
+  top += margin.paragraph;
+  top += advance(11, blockLine([{ text: form.university || 'University', bold: false }], top));
+
+  top += margin.date; // max(1.2%, 7%) = 7%
+  drawSegments([{ text: 'Date of submission:', bold: true }, { text: form.date || 'Date', bold: false }], top, 13, { align: 'center' });
+
   pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
   return pdf.output('blob');
 }
@@ -537,7 +608,7 @@ function coverHtml(form: FormState) {
   const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char] ?? char);
   const members = form.groupMembers.filter(Boolean);
   const memberMarkup = members.length ? `<p><strong>Group members:</strong><br>${members.map((member, index) => `Member ${index + 1}: ${escape(member)}`).join('<br>')}</p>` : '';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${escape(form.topic || 'BRUR assignment cover')}</title><style>@page{size:A4;margin:0}body{font-family:"Times New Roman",Times,serif;color:#111;margin:0}.cover{box-sizing:border-box;width:210mm;min-height:297mm;margin:auto;padding:24mm 25mm;text-align:center;border-top:2mm solid #1a8d7f}.logo{width:24mm;height:24mm;object-fit:contain;margin:0 auto 7mm}.university{font-size:24pt;font-weight:700;margin:0 0 5mm}.department{font-size:16pt;margin:0 0 20mm}.assignment{font-size:18pt;font-weight:700;margin:0 0 12mm}.meta{font-size:12pt;margin:0 0 4mm}.topic{display:inline-block;max-width:170mm;margin:10mm auto 0;padding:3mm 6mm;color:#2563eb;background:#eff6ff;font-size:16pt;font-weight:700}.details{width:160mm;margin:24mm auto 0;text-align:left;font-size:12pt;line-height:1.5}.details p{margin:0 0 8mm}.details strong{font-weight:700}.value{font-weight:400}.date{font-size:12pt;margin-top:12mm;text-align:center}</style></head><body><main class="cover"><img class="logo" src="${logoPath}" alt="BRUR logo"><p class="university">${escape(form.university || 'BEGUM ROKEYA UNIVERSITY')}</p><p class="department">${escape(form.department || form.teacherDepartment || 'Department')}</p><p class="assignment">${escape(form.assignment || 'ASSIGNMENT')}</p><p class="meta"><span>Course Code: </span><span class="value">${escape(form.courseCode)}</span></p><p class="meta"><span>Course Title: </span><span class="value">${escape(form.courseTitle)}</span></p><p class="meta"><strong>Session:</strong> <span class="value">${escape(form.session)}</span></p><p class="topic">${escape(form.topic || 'Untitled assignment')}</p><section class="details"><p><strong>Submitted by:</strong><br><span class="value">${escape(form.studentName)}<br>ID: ${escape(form.studentId)}<br>Registration No.: ${escape(form.registrationNo)}</span></p>${memberMarkup}<p><strong>Submitted to:</strong><br><span class="value">${escape(form.teacherName)}<br>${escape(form.teacherDesignation)}<br>${escape(form.teacherDepartment)}<br>${escape(form.university)}</span></p><p class="date"><strong>Date of submission:</strong> <span class="value">${escape(form.date)}</span></p></section></main></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escape(form.topic || 'BRUR assignment cover')}</title><style>@page{size:A4;margin:0}body{font-family:"Times New Roman",Times,serif;color:#111;margin:0}.cover{box-sizing:border-box;width:210mm;min-height:297mm;margin:auto;padding:24mm 25mm;text-align:center;border-top:2mm solid #1a8d7f}.logo{width:24mm;height:24mm;object-fit:contain;margin:0 auto 7mm}.university{font-size:24pt;font-weight:700;margin:0 0 5mm}.department{font-size:16pt;margin:0 0 20mm}.assignment{font-size:18pt;font-weight:700;margin:0 0 12mm}.meta{font-size:12pt;margin:0 0 4mm}.topic{display:inline-block;max-width:170mm;margin:10mm auto 0;padding:3mm 6mm;color:#2563eb;background:#eff6ff;font-size:16pt;font-weight:700}.details{width:160mm;margin:24mm auto 0;text-align:left;font-size:12pt;line-height:1.5}.details p{margin:0 0 8mm}.details strong{font-weight:700}.value{font-weight:400}.date{font-size:12pt;margin-top:12mm;text-align:center}</style></head><body><main class="cover"><img class="logo" src="${logoPath}" alt="BRUR logo"><p class="university">${escape(form.university || 'BEGUM ROKEYA UNIVERSITY')}</p><p class="department">${escape(form.department || form.teacherDepartment || 'Department')}</p><p class="assignment">${escape(form.assignment || 'ASSIGNMENT')}</p><p class="meta"><span>Course Code: </span><span class="value">${escape(form.courseCode)}</span></p><p class="meta"><span>Course Title: </span><span class="value">${escape(form.courseTitle)}</span></p><p class="meta"><strong>Session:</strong> <span class="value">${escape(form.session)}</span></p><p class="topic">${escape(form.topic || 'Untitled assignment')}</p><section class="details"><p><strong>Submitted by:</strong> <span class="value">${escape(form.studentName)}</span><br><strong>ID:</strong> <span class="value">${escape(form.studentId)}</span><br><strong>Registration No:</strong> <span class="value">${escape(form.registrationNo)}</span></p>${memberMarkup}<p><strong>Submitted to:</strong> <span class="value">${escape(form.teacherName)}</span><br><span class="value">${escape(form.teacherDesignation)}<br>${escape(form.teacherDepartment)}<br>${escape(form.university)}</span></p><p class="date"><strong>Date of submission:</strong> <span class="value">${escape(form.date)}</span></p></section></main></body></html>`;
 }
 
 function Router() {
