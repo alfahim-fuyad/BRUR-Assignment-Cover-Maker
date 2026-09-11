@@ -139,8 +139,30 @@
 .docx-group-label { float: right; }
 .docx-submitted-to { margin-top: 8%; }
 .docx-date { margin-top: 12%; font-size: 13px; font-size: 2.9545cqw; }
-.docx-professional .docx-logo { margin-top: 0; }
-.docx-professional .docx-assignment { margin-top: 8%; }
+/* ---- Professional design (university-standard framed cover) ----
+   Every metric mirrors createProfessionalPdf() in App.tsx: on the desktop the
+   cover content box is 440px wide, so 1cqw = 4.4px and X% margins resolve
+   against the same 440px the PDF cursor uses. px declarations are fallbacks. */
+.pc-frame-outer { position: absolute; inset: 14px; inset: 3.1818cqw; border: 2px solid #164a5b; border: 0.4545cqw solid #164a5b; pointer-events: none; }
+.pc-frame-inner { position: absolute; inset: 18px; inset: 4.0909cqw; border: 1px solid #9db8c2; border: 0.2273cqw solid #9db8c2; pointer-events: none; }
+.pc-logo { display: block; width: 64px; width: 14.5455cqw; height: 64px; height: 14.5455cqw; }
+.pc-university { margin-top: 3.5%; font-size: 20px; font-size: 4.5455cqw; font-weight: 700; color: #164a5b; text-transform: uppercase; }
+.pc-department { margin-top: 1.2%; font-size: 12.5px; font-size: 2.8409cqw; color: #374151; }
+.pc-rule { width: 44px; width: 10cqw; height: 2.2px; height: 0.5cqw; margin: 2.4% auto 0; background: #b9973f; }
+.pc-assignment { margin-top: 7.5%; font-size: 15px; font-size: 3.4091cqw; font-weight: 700; color: #164a5b; text-transform: uppercase; letter-spacing: 0.16em; padding-left: 0.16em; }
+.pc-meta { margin-top: 1.8%; font-size: 11px; font-size: 2.5cqw; }
+.pc-session { margin-top: 4.4%; }
+.pc-meta strong { font-weight: 700; color: #164a5b; }
+.pc-topic { box-sizing: border-box; margin: 9% auto 0; width: 84%; padding: 2.2% 3%; border-top: 2.2px solid #164a5b; border-top: 0.5cqw solid #164a5b; border-bottom: 2.2px solid #164a5b; border-bottom: 0.5cqw solid #164a5b; background: #f8fbfc; font-size: 14px; font-size: 3.1818cqw; font-weight: 700; color: #164a5b; }
+.pc-columns { display: flex; gap: 6.36%; width: 84%; margin: 10% auto 0; text-align: left; }
+.pc-col { flex: 1 1 0; min-width: 0; }
+.pc-col-label { font-size: 10px; font-size: 2.2727cqw; font-weight: 700; color: #164a5b; text-transform: uppercase; letter-spacing: 0.14em; }
+.pc-col-rule { width: 30px; width: 6.8182cqw; height: 1.6px; height: 0.3636cqw; margin-top: 3px; margin-top: 0.6818cqw; background: #b9973f; }
+.pc-name { margin-top: 8px; margin-top: 1.8182cqw; font-size: 11.5px; font-size: 2.6136cqw; font-weight: 700; }
+.pc-next { margin-top: 4px; margin-top: 0.9091cqw; }
+.pc-line { margin-top: 4px; margin-top: 0.9091cqw; font-size: 10.5px; font-size: 2.3864cqw; }
+.pc-line strong, .pc-date strong { font-weight: 700; color: #164a5b; }
+.pc-date { margin-top: 30%; font-size: 12.5px; font-size: 2.8409cqw; }
 .docx-modern { aspect-ratio: 11910 / 16845; }
 .docx-modern .docx-assignment { margin-top: 13%; }
 .docx-group .docx-topic { margin-top: 8%; }

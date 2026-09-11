@@ -128,6 +128,7 @@ function AppShell({ children }: { children: ReactNode }) {
 function CoverPreview({ form }: { form: FormState }) {
   const members = form.assignmentType === 'group' ? form.groupMembers.filter(Boolean) : [];
   const group = form.assignmentType === 'group';
+  if (form.design === 'professional') return <ProfessionalCover form={form} group={group} members={members} />;
   return (
     <div className={`cover-paper docx-cover docx-${form.design} p-7 text-center sm:p-10`}>
       <img className="docx-logo mx-auto object-contain" src={logoPath} alt="BRUR crest" data-testid="img-preview-logo" />
@@ -154,6 +155,47 @@ function CoverPreview({ form }: { form: FormState }) {
   );
 }
 
+// Professional design: university-standard framed cover with a double rule
+// border, gold accents and side-by-side "Submitted by / Submitted to" columns.
+// All spacing mirrors createProfessionalPdf() so the PDF stays a 1:1 print.
+function ProfessionalCover({ form, group, members }: { form: FormState; group: boolean; members: string[] }) {
+  return (
+    <div className="cover-paper docx-cover docx-professional p-7 text-center sm:p-10">
+      <div className="pc-frame-outer" aria-hidden="true" />
+      <div className="pc-frame-inner" aria-hidden="true" />
+      <img className="pc-logo mx-auto object-contain" src={logoPath} alt="BRUR crest" data-testid="img-preview-logo" />
+      <p className="pc-university">{form.university || 'Begum Rokeya University'}</p>
+      <p className="pc-department">{form.department || form.teacherDepartment || 'Department'}</p>
+      <div className="pc-rule" aria-hidden="true" />
+      <p className="pc-assignment">{(form.assignment || 'Assignment').toUpperCase()}</p>
+      <p className="pc-meta pc-session"><strong>Session:</strong> {form.session || '2024-25'}</p>
+      <p className="pc-meta"><strong>Course Title:</strong> {form.courseTitle || 'Course title'}</p>
+      <p className="pc-meta"><strong>Course Code:</strong> {form.courseCode || 'Course code'}</p>
+      <div className="pc-topic" data-testid="text-preview-topic">{form.topic || 'Assignment topic'}</div>
+      <div className="pc-columns">
+        <div className="pc-col">
+          <p className="pc-col-label">Submitted By</p>
+          <div className="pc-col-rule" aria-hidden="true" />
+          {group ? members.map((member, index) => <p key={`pc-member-${index}`} className={`pc-name${index ? ' pc-next' : ''}`}>{member || `Member ${index + 1}`}</p>) : <>
+            <p className="pc-name">{form.studentName || 'Name'}</p>
+            <p className="pc-line"><strong>ID:</strong> {form.studentId || 'ID'}</p>
+            <p className="pc-line"><strong>Registration no:</strong> {form.registrationNo || 'Registration no'}</p>
+          </>}
+        </div>
+        <div className="pc-col">
+          <p className="pc-col-label">Submitted To</p>
+          <div className="pc-col-rule" aria-hidden="true" />
+          <p className="pc-name">{form.teacherName || 'Teacher name'}</p>
+          <p className="pc-line">{form.teacherDesignation || 'Designation'}</p>
+          <p className="pc-line">{form.teacherDepartment || 'Department'}</p>
+          <p className="pc-line">{form.university || 'University'}</p>
+        </div>
+      </div>
+      <p className="pc-date"><strong>Date of submission:</strong> {form.date || 'Date'}</p>
+    </div>
+  );
+}
+
 function Field({ label, value, onChange, placeholder, type = 'text', testId, className = '' }: { label: string; value: string; onChange: (event: ChangeEvent<HTMLInputElement>) => void; placeholder?: string; type?: string; testId: string; className?: string }) {
   return <label className={className}><span className="field-label">{label}</span><input className="input-shell" type={type} value={value} onChange={onChange} placeholder={placeholder} data-testid={testId} /></label>;
 }
@@ -165,7 +207,9 @@ function SectionTitle({ number, icon, title, note }: { number: string; icon: Rea
 function Home() {
   const [form, setForm] = useState<FormState>(() => {
     const savedForm = readSaved();
-    return savedForm ? { ...savedForm, design: 'simple', assignmentType: 'individual' } : initialState;
+    // The professional cover is unlocked, so a saved professional draft is honoured;
+    // 'modern' is still coming soon and falls back to the simple cover.
+    return savedForm ? { ...savedForm, design: savedForm.design === 'professional' ? 'professional' : 'simple', assignmentType: 'individual' } : initialState;
   });
   const [teacherQuery, setTeacherQuery] = useState('');
   const [saved, setSaved] = useState(Boolean(readSaved()));
@@ -205,7 +249,7 @@ function Home() {
     const title = form.topic || 'BRUR-assignment-cover';
     const cleanTitle = title.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     const blob = kind === 'pdf'
-      ? await createPdf(form)
+      ? await (form.design === 'professional' ? createProfessionalPdf(form) : createPdf(form))
       : kind === 'doc'
         ? await createDocx(form)
         : new Blob([coverText(form)], { type: 'text/plain;charset=utf-8' });
@@ -238,7 +282,7 @@ function Home() {
             <section className="section-card rise-in" style={{ animationDelay: '.1s' }}><SectionTitle number="02" icon={<UserRound size={17} />} title="Submitted to" note="Search a teacher, then edit every detail as needed." /><div><span className="field-label">Search teacher name</span><div className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input className="input-shell input-with-icon" value={teacherQuery} onChange={(event) => setTeacherQuery(event.target.value)} placeholder="Search by name or faculty ID" data-testid="input-teacher-search" />{teacherQuery && <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{filteredTeachers.length ? filteredTeachers.map((teacher) => <button key={teacher.id} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-teal-50" onClick={() => chooseTeacher(teacher)} data-testid={`button-teacher-${teacher.id}`}><span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500">{teacher.id}</span><span><span className="block text-sm font-semibold text-slate-800">{teacher.name}</span><span className="block text-xs text-slate-500">{teacher.designation}</span></span></button>) : <p className="px-3 py-3 text-xs text-slate-500">No teacher match.</p>}</div>}</div></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Teacher name" value={form.teacherName} onChange={field('teacherName')} testId="input-teacher-name" /><Field label="Designation" value={form.teacherDesignation} onChange={field('teacherDesignation')} testId="input-teacher-designation" /><Field label="Department" value={form.teacherDepartment} onChange={field('teacherDepartment')} testId="input-teacher-department" /><Field label="University" value={form.university} onChange={field('university')} testId="input-university" /><Field label="Date of submission" value={form.date} onChange={field('date')} placeholder="DD/MM/YYYY" testId="input-date" /></div></section>
             <section className="section-card rise-in" style={{ animationDelay: '.15s' }}><SectionTitle number="03" icon={<BookOpen size={17} />} title="Submitted by" note="Enter the student details shown on the cover." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Name" value={form.studentName} onChange={field('studentName')} testId="input-student-name" /><Field label="ID" value={form.studentId} onChange={field('studentId')} testId="input-student-id" /><Field label="Registration no." value={form.registrationNo} onChange={field('registrationNo')} testId="input-registration-no" /></div></section>
              <section className="section-card rise-in" style={{ animationDelay: '.2s' }}><SectionTitle number="04" icon={<Users size={17} />} title="Assignment type" note="Individual cover is available now. Group cover is coming soon." /><div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1"><button className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 text-xs font-bold text-[#164a5b] shadow-sm" onClick={() => update('assignmentType', 'individual')} data-testid="button-individual"><UserRound size={15} /> Individual</button><button className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-400" disabled data-testid="button-group"><Users size={15} /> Group <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">Coming Soon</span></button></div></section>
-             <section className="section-card rise-in" style={{ animationDelay: '.25s' }}><SectionTitle number="05" icon={<LayoutTemplate size={17} />} title="Choose a finish" note="The simple cover is available now. More styles are coming soon." /><div className="grid gap-3 sm:grid-cols-3">{(['simple', 'professional', 'modern'] as Design[]).map((design) => { const available = design === 'simple'; return <button key={design} onClick={() => available && update('design', design)} disabled={!available} className={`template-option ${form.design === design ? 'template-option-active' : ''} ${!available ? 'cursor-not-allowed opacity-70' : ''}`} data-testid={`button-template-${design}`}><div className={`template-mini mini-${design}`}><span /><span /><span /></div><span className="mt-2 block text-xs font-bold capitalize text-slate-700">{design}</span><span className="mt-0.5 block text-[10px] text-slate-400">{available ? 'Simple A4 cover' : 'Coming Soon'}</span>{form.design === design && <Check className="absolute right-2 top-2 text-teal-600" size={15} />}{!available && <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">Coming Soon</span>}</button>; })}</div></section>
+             <section className="section-card rise-in" style={{ animationDelay: '.25s' }}><SectionTitle number="05" icon={<LayoutTemplate size={17} />} title="Choose a finish" note="Simple and professional covers are ready. Modern is coming soon." /><div className="grid gap-3 sm:grid-cols-3">{(['simple', 'professional', 'modern'] as Design[]).map((design) => { const available = design !== 'modern'; return <button key={design} onClick={() => available && update('design', design)} disabled={!available} className={`template-option ${form.design === design ? 'template-option-active' : ''} ${!available ? 'cursor-not-allowed opacity-70' : ''}`} data-testid={`button-template-${design}`}><div className={`template-mini mini-${design}`}><span /><span /><span /></div><span className="mt-2 block text-xs font-bold capitalize text-slate-700">{design}</span><span className="mt-0.5 block text-[10px] text-slate-400">{design === 'simple' ? 'Simple A4 cover' : design === 'professional' ? 'Framed two-column cover' : 'Coming Soon'}</span>{form.design === design && <Check className="absolute right-2 top-2 text-teal-600" size={15} />}{!available && <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">Coming Soon</span>}</button>; })}</div></section>
             <div className="no-print flex items-center justify-between rounded-2xl border border-[#c7e9e2] bg-[#effaf7] p-4"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm"><Save size={16} /></div><div><p className="text-xs font-bold text-[#164a5b]">Keep your progress</p><p className="text-[11px] text-slate-500">Drafts stay in this browser only.</p></div></div><button className="rounded-xl bg-[#1a8d7f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#147666]" onClick={saveDraft} data-testid="button-save-draft">{saved && saveLabel === 'Save draft' ? 'Save again' : saveLabel}</button></div>
           </div>
           <aside className="lg:sticky lg:top-6"><div className="no-print mb-3 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Live preview</p><h2 className="font-display text-lg font-bold text-[#164a5b]">Your cover, in focus.</h2></div><div className="rounded-full bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">A4 · {form.design}</div></div><div className="preview-frame soft-pop" data-testid="section-preview"><CoverPreview form={form} /></div><div className="no-print mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white/75 px-3.5 py-3 text-xs text-slate-500"><Sparkles size={14} className="shrink-0 text-[#e56b51]" /><span>Updates as you type. Print when the details feel right.</span><ArrowRight size={14} className="ml-auto shrink-0 text-slate-300" /></div></aside>
@@ -408,6 +452,12 @@ const PDF_BASELINE = 0.9125;
 const PDF_INK: [number, number, number] = [17, 17, 17]; // #111111
 const PDF_TOPIC_INK: [number, number, number] = [37, 99, 235]; // #2563eb
 const PDF_TOPIC_BG: [number, number, number] = [239, 246, 255]; // #eff6ff
+// Professional design palette (mirrors the .pc-* styles in index.css).
+const PDF_NAVY: [number, number, number] = [22, 74, 91]; // #164a5b — frame, headings, labels
+const PDF_GOLD: [number, number, number] = [185, 151, 63]; // #b9973f — accent rules
+const PDF_SOFT: [number, number, number] = [55, 65, 81]; // #374151 — secondary ink
+const PDF_HAIR: [number, number, number] = [157, 184, 194]; // #9db8c2 — inner hairline
+const PDF_BAND: [number, number, number] = [248, 251, 252]; // #f8fbfc — topic band fill
 
 type PdfSegment = { text: string; bold: boolean };
 
@@ -555,6 +605,194 @@ async function createPdf(form: FormState) {
 
   top += margin.date; // .docx-date margin-top: 12% of 440px = 52.8px
   drawSegments([{ text: 'Date of submission:', bold: true }, { text: form.date || 'Date', bold: false }], top, 13, { align: 'center' });
+
+  pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
+  return pdf.output('blob');
+}
+
+// Professional cover PDF: mirrors the .pc-* preview CSS 1:1 with the same
+// preview-px -> mm mapping as createPdf (520px sheet -> A4). The vertical
+// cursor runs in preview pixels and every percentage margin resolves against
+// the 440px desktop content box, exactly like the stylesheet does.
+async function createProfessionalPdf(form: FormState) {
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const px = (value: number) => value * PDF_MM_PER_PX;
+  const fontPt = (value: number) => (value * PDF_MM_PER_PX) / 0.352778;
+  const center = 105;
+  const contentWidth = px(440); // sheet minus its 40px padding on each side
+  const blockWidth = px(369.6); // .pc-topic / .pc-columns width (84% of content)
+  const blockX = (210 - blockWidth) / 2;
+  const colGap = px(28); // .pc-columns gap: 6.36% of 440px
+  const colWidth = (blockWidth - colGap) / 2;
+  const colX = [blockX, blockX + colWidth + colGap];
+
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 0, 210, 297, 'F');
+
+  // Double certificate frame: 2px navy rule at 14px inset + 0.9px hairline at 18px.
+  pdf.setDrawColor(PDF_NAVY[0], PDF_NAVY[1], PDF_NAVY[2]);
+  pdf.setLineWidth(px(2));
+  pdf.rect(px(14), px(14), 210 - px(28), 297 - px(28), 'S');
+  pdf.setDrawColor(PDF_HAIR[0], PDF_HAIR[1], PDF_HAIR[2]);
+  pdf.setLineWidth(px(0.9));
+  pdf.rect(px(18), px(18), 210 - px(36), 297 - px(36), 'S');
+
+  // BRUR crest: 64px square, horizontally centered, right on the 40px padding line.
+  try {
+    const logoData = await loadImageDataUrl(logoPath);
+    pdf.addImage(logoData, 'PNG', center - px(32), px(40), px(64), px(64), undefined, 'FAST');
+  } catch {
+    // The cover remains usable if a browser blocks the optional logo rasterization.
+  }
+
+  const setRun = (fontPx: number, bold: boolean, color: [number, number, number]) => {
+    pdf.setFont('times', bold ? 'bold' : 'normal');
+    pdf.setFontSize(fontPt(fontPx));
+    pdf.setTextColor(color[0], color[1], color[2]);
+  };
+
+  // Word-wrap bold/regular segments exactly like the browser wraps the preview text.
+  const wrap = (segments: PdfSegment[], fontPx: number, maxWidth: number) => {
+    const words: PdfSegment[] = [];
+    segments.forEach((segment) => String(segment.text).split(/\s+/).filter(Boolean).forEach((word) => words.push({ text: word, bold: segment.bold })));
+    setRun(fontPx, false, PDF_INK);
+    const spaceWidth = pdf.getTextWidth(' ');
+    const lines: Array<Array<PdfSegment & { gap: number; width: number }>> = [];
+    let line: Array<PdfSegment & { gap: number; width: number }> = [];
+    let lineWidth = 0;
+    words.forEach((word) => {
+      setRun(fontPx, word.bold, PDF_INK);
+      const wordWidth = pdf.getTextWidth(word.text);
+      const gap = line.length ? spaceWidth : 0;
+      if (line.length && lineWidth + gap + wordWidth > maxWidth) {
+        lines.push(line);
+        line = [{ text: word.text, bold: word.bold, gap: 0, width: wordWidth }];
+        lineWidth = wordWidth;
+      } else {
+        line.push({ text: word.text, bold: word.bold, gap, width: gap + wordWidth });
+        lineWidth += gap + wordWidth;
+      }
+    });
+    if (line.length) lines.push(line);
+    return lines;
+  };
+
+  // Draws one paragraph; bold words take boldColor, regular words regColor.
+  const drawPara = (segments: PdfSegment[], topPx: number, fontPx: number, options: { align?: 'center' | 'left'; x?: number; maxWidth?: number; boldColor?: [number, number, number]; regColor?: [number, number, number]; color?: [number, number, number] } = {}) => {
+    const lines = wrap(segments, fontPx, options.maxWidth ?? contentWidth);
+    const boldColor = options.boldColor ?? options.color ?? PDF_INK;
+    const regColor = options.regColor ?? options.color ?? PDF_INK;
+    lines.forEach((line, index) => {
+      const total = line.reduce((sum, word) => sum + word.width, 0);
+      let cursor = options.align === 'left' ? (options.x ?? 0) : center - total / 2;
+      const baseline = px(topPx + index * fontPx * PDF_LINE_HEIGHT + PDF_BASELINE * fontPx);
+      line.forEach((word) => {
+        setRun(fontPx, word.bold, word.bold ? boldColor : regColor);
+        pdf.text(word.text, cursor + word.gap, baseline);
+        cursor += word.width;
+      });
+    });
+    return lines.length;
+  };
+  const advance = (fontPx: number, lineCount: number) => lineCount * fontPx * PDF_LINE_HEIGHT;
+  // Letter-spaced caps line (mirrors CSS letter-spacing via jsPDF charSpace).
+  const drawSpaced = (text: string, topPx: number, fontPx: number, csPx: number, x?: number) => {
+    setRun(fontPx, true, PDF_NAVY);
+    const cs = px(csPx);
+    const width = pdf.getTextWidth(text) + cs * Math.max(text.length - 1, 0);
+    pdf.text(text, x ?? center - width / 2, px(topPx + PDF_BASELINE * fontPx), { charSpace: cs });
+  };
+
+  // Vertical cursor in preview px; margins mirror the .pc-* CSS percentages
+  // of the 440px content box (3.5% = 15.4px, 1.2% = 5.28px, ...).
+  const margin = { uni: 15.4, dept: 5.28, rule: 10.56, ruleH: 2.2, assign: 33, session: 19.36, meta: 7.92, topic: 39.6, topicPad: 9.68, cols: 44, labelRule: 3, colRuleH: 1.6, name: 8, line: 4, date: 132 };
+  let top = 40; // .cover-paper sm:p-10 padding-top
+  top += 64; // .pc-logo crest box
+
+  top += margin.uni; // .pc-university margin-top: 3.5%
+  top += advance(20, drawPara([{ text: (form.university || 'Begum Rokeya University').toUpperCase(), bold: true }], top, 20, { color: PDF_NAVY }));
+  top += margin.dept; // .pc-department margin-top: 1.2%
+  top += advance(12.5, drawPara([{ text: form.department || form.teacherDepartment || 'Department', bold: false }], top, 12.5, { color: PDF_SOFT }));
+
+  top += margin.rule; // .pc-rule margin-top: 2.4%
+  pdf.setFillColor(PDF_GOLD[0], PDF_GOLD[1], PDF_GOLD[2]);
+  pdf.rect(center - px(22), px(top), px(44), px(margin.ruleH), 'F');
+  top += margin.ruleH;
+
+  top += margin.assign; // .pc-assignment margin-top: 7.5%
+  const assignmentText = (form.assignment || 'Assignment').toUpperCase();
+  setRun(15, true, PDF_NAVY);
+  const csAssign = px(2.4); // letter-spacing: .16em of 15px
+  const assignWidth = pdf.getTextWidth(assignmentText) + csAssign * Math.max(assignmentText.length - 1, 0);
+  if (assignWidth <= contentWidth) {
+    pdf.text(assignmentText, center - assignWidth / 2, px(top + PDF_BASELINE * 15), { charSpace: csAssign });
+    top += advance(15, 1);
+  } else {
+    top += advance(15, drawPara([{ text: assignmentText, bold: true }], top, 15, { color: PDF_NAVY }));
+  }
+
+  top += margin.session; // .pc-session margin-top: 4.4%
+  top += advance(11, drawPara([{ text: 'Session:', bold: true }, { text: form.session || '2024-25', bold: false }], top, 11, { boldColor: PDF_NAVY, regColor: PDF_INK }));
+  top += margin.meta; // .pc-meta margin-top: 1.8%
+  top += advance(11, drawPara([{ text: 'Course Title:', bold: true }, { text: form.courseTitle || 'Course title', bold: false }], top, 11, { boldColor: PDF_NAVY, regColor: PDF_INK }));
+  top += margin.meta;
+  top += advance(11, drawPara([{ text: 'Course Code:', bold: true }, { text: form.courseCode || 'Course code', bold: false }], top, 11, { boldColor: PDF_NAVY, regColor: PDF_INK }));
+
+  // Topic band: light fill framed by 2.2px navy top/bottom rules (mirrors .pc-topic).
+  // Border-box: the two 2.2px borders add 4.4px to the band height in the browser too.
+  top += margin.topic; // .pc-topic margin-top: 9%
+  const topicFont = 14;
+  const topicLines = wrap([{ text: form.topic || 'Assignment topic', bold: true }], topicFont, blockWidth - px(26.4));
+  const bandHeight = margin.topicPad * 2 + topicLines.length * topicFont * PDF_LINE_HEIGHT + margin.ruleH * 2;
+  pdf.setFillColor(PDF_BAND[0], PDF_BAND[1], PDF_BAND[2]);
+  pdf.rect(blockX, px(top), blockWidth, px(bandHeight), 'F');
+  pdf.setFillColor(PDF_NAVY[0], PDF_NAVY[1], PDF_NAVY[2]);
+  pdf.rect(blockX, px(top), blockWidth, px(margin.ruleH), 'F');
+  pdf.rect(blockX, px(top + bandHeight - margin.ruleH), blockWidth, px(margin.ruleH), 'F');
+  topicLines.forEach((line, index) => {
+    const total = line.reduce((sum, word) => sum + word.width, 0);
+    let cursor = center - total / 2;
+    const baseline = px(top + margin.ruleH + margin.topicPad + index * topicFont * PDF_LINE_HEIGHT + PDF_BASELINE * topicFont);
+    line.forEach((word) => {
+      setRun(topicFont, true, PDF_NAVY);
+      pdf.text(word.text, cursor + word.gap, baseline);
+      cursor += word.width;
+    });
+  });
+  top += bandHeight;
+
+  // Submitted by / Submitted to: two left-aligned columns inside the 84% block.
+  const isGroup = form.assignmentType === 'group';
+  const members = isGroup ? form.groupMembers.filter(Boolean) : [];
+  const drawColumn = (x: number, label: string, name: string | null, details: PdfSegment[][], memberList: string[] | null) => {
+    let cursor = top;
+    drawSpaced(label.toUpperCase(), cursor, 10, 1.4, x);
+    cursor += 10 * PDF_LINE_HEIGHT;
+    pdf.setFillColor(PDF_GOLD[0], PDF_GOLD[1], PDF_GOLD[2]);
+    pdf.rect(x, px(cursor + margin.labelRule), px(30), px(margin.colRuleH), 'F');
+    cursor += margin.labelRule + margin.colRuleH + margin.name;
+    if (name !== null) {
+      cursor += advance(11.5, drawPara([{ text: name, bold: true }], cursor, 11.5, { align: 'left', x, maxWidth: colWidth, color: PDF_INK }));
+    } else if (memberList) {
+      memberList.forEach((member, index) => {
+        if (index) cursor += margin.line; // .pc-next
+        cursor += advance(11.5, drawPara([{ text: member, bold: true }], cursor, 11.5, { align: 'left', x, maxWidth: colWidth, color: PDF_INK }));
+      });
+    }
+    details.forEach((segments) => {
+      cursor += margin.line; // .pc-line margin-top: 4px
+      cursor += advance(10.5, drawPara(segments, cursor, 10.5, { align: 'left', x, maxWidth: colWidth, boldColor: PDF_NAVY, regColor: PDF_INK }));
+    });
+    return cursor;
+  };
+
+  top += margin.cols; // .pc-columns margin-top: 10%
+  const leftBottom = drawColumn(colX[0], 'Submitted By', isGroup ? null : form.studentName || 'Name', isGroup ? [] : [[{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], [{ text: 'Registration no:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }]], isGroup ? members : null);
+  const rightBottom = drawColumn(colX[1], 'Submitted To', form.teacherName || 'Teacher name', [[{ text: form.teacherDesignation || 'Designation', bold: false }], [{ text: form.teacherDepartment || 'Department', bold: false }], [{ text: form.university || 'University', bold: false }]], null);
+  top = Math.max(leftBottom, rightBottom); // flex container height = tallest column
+
+  top += margin.date; // .pc-date margin-top: 30% of 440px = 132px
+  drawPara([{ text: 'Date of submission:', bold: true }, { text: form.date || 'Date', bold: false }], top, 12.5, { align: 'center', boldColor: PDF_NAVY, regColor: PDF_INK });
 
   pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
   return pdf.output('blob');
