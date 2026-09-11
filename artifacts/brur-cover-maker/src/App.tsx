@@ -267,7 +267,7 @@ function ProfessionalCover({ form, group, rows }: { form: FormState; group: bool
       <div className="pc-topic" data-testid="text-preview-topic">{form.topic || 'Assignment topic'}</div>
       <div className="pc-columns">
         <div className="pc-col">
-          <p className="pc-col-label">{group ? `Submitted By — Group: ${groupNoOf(form)}` : 'Submitted By'}</p>
+          <p className="pc-col-label">{group ? `Submitted By — Group:\u00A0${groupNoOf(form)}` : 'Submitted By'}</p>
           <div className="pc-col-rule" aria-hidden="true" />
           {group ? <table className="pc-gtable" data-testid="table-group-members">
             <thead><tr><th>Name</th><th>ID</th></tr></thead>
@@ -775,12 +775,16 @@ function spacedWrapLines(pdf: jsPDF, px: (value: number) => number, options: {
   const cs = px(csPx);
   pdf.setFont('times', 'bold');
   pdf.setFontSize((fontPx * PDF_MM_PER_PX) / 0.352778);
-  const wordWidth = (word: string) => pdf.getTextWidth(word) + cs * word.length;
+  // Tokens split on plain spaces ONLY, so a NBSP inside the text (e.g. the
+  // unbreakable "GROUP:\u00A0nn" pair) stays one word; the NBSP itself is
+  // measured/drawn as a regular space (identical glyph width).
+  const plain = (word: string) => word.replace(/\u00A0/g, ' ');
+  const wordWidth = (word: string) => pdf.getTextWidth(plain(word)) + cs * word.length;
   const spaceWidth = pdf.getTextWidth(' ') + cs;
   const lines: string[][] = [];
   let line: string[] = [];
   let lineWidth = 0;
-  text.split(/\s+/).filter(Boolean).forEach((word) => {
+  text.split(/ +/).filter(Boolean).forEach((word) => {
     const width = wordWidth(word);
     const gap = line.length ? spaceWidth : 0;
     if (line.length && lineWidth + gap + width > maxW) {
@@ -811,7 +815,7 @@ function drawPdfSpacedWrap(pdf: jsPDF, px: (value: number) => number, fontPt: (v
   const lines = spacedWrapLines(pdf, px, { text, fontPx, csPx, maxW });
   lines.forEach((words, index) => {
     const top = topPx + index * fontPx * PDF_LINE_HEIGHT;
-    pdf.text(words.join(' '), px(x), px(top + PDF_BASELINE * fontPx), { charSpace: cs });
+    pdf.text(words.join(' ').replace(/\u00A0/g, ' '), px(x), px(top + PDF_BASELINE * fontPx), { charSpace: cs });
   });
   return lines.length;
 }
@@ -926,6 +930,7 @@ async function createPdf(form: FormState) {
   const contentWidth = px(440); // paper minus its 40px padding on each side
   const blockWidth = px(369.6); // .docx-topic / .docx-submission width (84% of content)
   const blockX = (210 - blockWidth) / 2;
+  const blockXpx = (520 - 369.6) / 2; // the same block left edge in preview px — drawPdfGroupGrid converts with px() internally
 
   // Solid, print-safe background. The preview paper is plain white with no extra decoration.
   pdf.setFillColor(255, 255, 255);
@@ -1036,7 +1041,7 @@ async function createPdf(form: FormState) {
   if (isGroup) {
     top += advance(11, blockLine([{ text: groupLabelOf(form), bold: true }], top));
     top += 14.78; // .docx-gtable margin-top: 4% resolves against the 369.6px block, not the 440px box
-    top += drawPdfGroupGrid(pdf, px, fontPt, { x: blockX, topPx: top, fontPx: 11, colWidths: [221.76, 147.84], padX: 8, padY: 2, header: ['Name', 'ID'], rows: groupRows(form), fill: [241, 246, 249], border: [199, 212, 220], headerColor: PDF_INK, ink: PDF_INK });
+    top += drawPdfGroupGrid(pdf, px, fontPt, { x: blockXpx, topPx: top, fontPx: 11, colWidths: [221.76, 147.84], padX: 8, padY: 2, header: ['Name', 'ID'], rows: groupRows(form), fill: [241, 246, 249], border: [199, 212, 220], headerColor: PDF_INK, ink: PDF_INK });
   } else {
     top += advance(11, blockLine([{ text: 'Submitted by-', bold: true }], top));
     top += margin.paragraph;
@@ -1237,7 +1242,9 @@ async function createProfessionalPdf(form: FormState) {
   };
 
   top += margin.cols; // .pc-columns margin-top: 10%
-  const leftBottom = drawColumn(colX[0], isGroup ? `Submitted By — Group: ${groupNoOf(form)}` : 'Submitted By', isGroup ? null : form.studentName || 'Name', isGroup ? [] : [[{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], [{ text: 'Registration no:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }]], isGroup ? groupRows(form) : null);
+  // The NBSP keeps "GROUP: nn" unbreakable so the number never orphans onto its
+  // own line — the label wraps as "SUBMITTED BY —" / "GROUP: nn" in PDF and preview alike.
+  const leftBottom = drawColumn(colX[0], isGroup ? `Submitted By — Group:\u00A0${groupNoOf(form)}` : 'Submitted By', isGroup ? null : form.studentName || 'Name', isGroup ? [] : [[{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], [{ text: 'Registration no:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }]], isGroup ? groupRows(form) : null);
   const rightBottom = drawColumn(colX[1], 'Submitted To', form.teacherName || 'Teacher name', [[{ text: form.teacherDesignation || 'Designation', bold: false }], [{ text: form.teacherDepartment || 'Department', bold: false }], [{ text: form.university || 'University', bold: false }]], null);
   top = Math.max(leftBottom, rightBottom); // flex container height = tallest column
 
