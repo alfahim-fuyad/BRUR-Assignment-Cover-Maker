@@ -139,6 +139,11 @@
 .docx-group-label { float: right; }
 .docx-submitted-to { margin-top: 8%; }
 .docx-date { margin-top: 12%; font-size: 13px; font-size: 2.9545cqw; }
+/* Group mode: "Submitted by — GROUP: nn" header + a bordered Name/ID member table. */
+.docx-gtable { width: 100%; margin-top: 4%; border-collapse: collapse; font-size: 11px; font-size: 2.5cqw; }
+.docx-gtable th, .docx-gtable td { border: 1px solid #c7d4dc; padding: 2px 8px; padding: 0.4545cqw 1.8182cqw; text-align: left; }
+.docx-gtable th { font-weight: 700; background: #f1f6f9; }
+.docx-gtable th:last-child, .docx-gtable td:last-child { width: 40%; }
 /* ---- Professional design (university-standard framed cover) ----
    Every metric mirrors createProfessionalPdf() in App.tsx: on the desktop the
    cover content box is 440px wide, so 1cqw = 4.4px and X% margins resolve
@@ -163,6 +168,11 @@
 .pc-line { margin-top: 4px; margin-top: 0.9091cqw; font-size: 10.5px; font-size: 2.3864cqw; }
 .pc-line strong, .pc-date strong { font-weight: 700; color: #164a5b; }
 .pc-date { margin-top: 30%; font-size: 12.5px; font-size: 2.8409cqw; }
+/* Group mode member table inside the Submitted By column. */
+.pc-gtable { width: 100%; margin-top: 8px; margin-top: 1.8182cqw; border-collapse: collapse; font-size: 9.5px; font-size: 2.1591cqw; }
+.pc-gtable th, .pc-gtable td { border: 1px solid #b9cdd5; padding: 2.5px 5px; padding: 0.5682cqw 1.1364cqw; text-align: left; }
+.pc-gtable th { font-weight: 700; color: #164a5b; background: #f8fbfc; }
+.pc-gtable th:last-child, .pc-gtable td:last-child { width: 40%; }
 /* ---- Modern design (bold banner cover) ----
    The modern cover drops the paper padding, so 1cqw resolves against the full
    520px sheet: 1cqw = 5.2px on the desktop preview. Every metric mirrors
@@ -191,6 +201,15 @@
 .mc-line strong { font-weight: 700; color: #0f3a47; }
 .mc-date { margin-top: 130px; margin-top: 25cqw; font-size: 12px; font-size: 2.3077cqw; text-align: center; }
 .mc-date strong { font-weight: 700; color: #1a8d7f; }
+/* Group mode member table inside the Submitted By card, plus the tighter
+   date gap that keeps a full 5-member table comfortably inside the sheet. */
+.mc-gtable { width: 100%; margin-top: 9px; margin-top: 1.7308cqw; border-collapse: collapse; font-size: 10px; font-size: 1.9231cqw; }
+.mc-gtable th, .mc-gtable td { border: 1px solid #cfe2dc; padding: 2.5px 5px; padding: 0.4808cqw 0.9615cqw; text-align: left; }
+.mc-gtable th { font-weight: 700; color: #147a6e; background: #eaf5f2; }
+.mc-gtable th:last-child, .mc-gtable td:last-child { width: 40%; }
+.group-on .docx-date { margin-top: 2%; }
+.group-on .pc-date { margin-top: 20%; }
+.group-on .mc-date { margin-top: 70px; margin-top: 13.4615cqw; }
 .docx-modern { aspect-ratio: 11910 / 16845; }
 .docx-modern .docx-assignment { margin-top: 13%; }
 .docx-group .docx-topic { margin-top: 8%; }

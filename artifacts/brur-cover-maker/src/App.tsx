@@ -32,6 +32,7 @@ const queryClient = new QueryClient();
 
 type Design = 'simple' | 'professional' | 'modern';
 type AssignmentType = 'individual' | 'group';
+type GroupMember = { name: string; id: string };
 type Teacher = { id: number; name: string; designation: string };
 type Course = { code: string; title: string; department: string };
 type FormState = {
@@ -50,9 +51,14 @@ type FormState = {
   studentName: string;
   studentId: string;
   registrationNo: string;
-  groupMembers: string[];
+  groupNo: string;
+  groupSize: number;
+  groupMembers: GroupMember[];
   design: Design;
 };
+
+const MAX_MEMBERS = 5;
+const DEFAULT_GROUP_NO = '05';
 
 const teachers: Teacher[] = [
   { id: 50, name: 'Prof. Dr. Abu Kalam Md. Farid Ul Islam', designation: 'Professor' },
@@ -96,9 +102,45 @@ const initialState: FormState = {
   studentName: 'Your name',
   studentId: '',
   registrationNo: '',
-  groupMembers: ['', '', ''],
+  groupNo: DEFAULT_GROUP_NO,
+  groupSize: 3,
+  groupMembers: normalizeMembers([]), // five blank { name, id } slots
   design: 'simple',
 };
+
+// Group state helpers: the member list always stores MAX_MEMBERS slots so
+// shrinking the member count never loses typed data, and old saved drafts
+// that kept plain name strings migrate into { name, id } entries.
+function normalizeMembers(raw: unknown): GroupMember[] {
+  const source = Array.isArray(raw) ? raw : [];
+  return Array.from({ length: MAX_MEMBERS }, (_, index) => {
+    const entry = source[index];
+    if (typeof entry === 'string') return { name: entry, id: '' };
+    const record = (entry ?? {}) as { name?: unknown; id?: unknown };
+    return {
+      name: typeof record.name === 'string' ? record.name : '',
+      id: typeof record.id === 'string' ? record.id : '',
+    };
+  });
+}
+
+function clampGroupSize(value: unknown) {
+  const size = Math.round(Number(value));
+  return Number.isFinite(size) ? Math.min(MAX_MEMBERS, Math.max(1, size)) : 3;
+}
+
+// The member rows shown on the cover: first groupSize slots, with the same
+// "Member n / ID" placeholder fallbacks as the reference layout.
+function groupRows(form: FormState) {
+  if (form.assignmentType !== 'group') return [];
+  return form.groupMembers.slice(0, clampGroupSize(form.groupSize)).map((member, index) => ({
+    name: member.name.trim() || `Member ${index + 1}`,
+    id: member.id.trim() || 'ID',
+  }));
+}
+
+const groupNoOf = (form: FormState) => form.groupNo.trim() || DEFAULT_GROUP_NO;
+const groupLabelOf = (form: FormState) => `Submitted by — GROUP: ${groupNoOf(form)}`;
 
 function readSaved(): FormState | null {
   try {
@@ -109,7 +151,9 @@ function readSaved(): FormState | null {
       ...initialState,
       ...parsed,
       department: parsed.department ?? '',
-      groupMembers: Array.from({ length: 3 }, (_, index) => parsed.groupMembers?.[index] ?? ''),
+      groupNo: typeof parsed.groupNo === 'string' ? parsed.groupNo : DEFAULT_GROUP_NO,
+      groupSize: clampGroupSize(parsed.groupSize),
+      groupMembers: normalizeMembers(parsed.groupMembers),
       design: parsed.design ?? 'professional',
     };
   } catch {
@@ -122,12 +166,13 @@ function AppShell({ children }: { children: ReactNode }) {
 }
 
 function CoverPreview({ form }: { form: FormState }) {
-  const members = form.assignmentType === 'group' ? form.groupMembers.filter(Boolean) : [];
   const group = form.assignmentType === 'group';
-  if (form.design === 'professional') return <ProfessionalCover form={form} group={group} members={members} />;
-  if (form.design === 'modern') return <ModernCover form={form} group={group} members={members} />;
+  const rows = groupRows(form);
+  const groupOn = group ? ' group-on' : '';
+  if (form.design === 'professional') return <ProfessionalCover form={form} group={group} rows={rows} />;
+  if (form.design === 'modern') return <ModernCover form={form} group={group} rows={rows} />;
   return (
-    <div className={`cover-paper docx-cover docx-${form.design} p-7 text-center sm:p-10`}>
+    <div className={`cover-paper docx-cover docx-${form.design}${groupOn} p-7 text-center sm:p-10`}>
       <img className="docx-logo mx-auto object-contain" src={logoPath} alt="BRUR crest" data-testid="img-preview-logo" />
       <p className="docx-university">{form.university || 'Begum Rokeya University'}</p>
       <p className="docx-department">{form.department || form.teacherDepartment || 'Department'}</p>
@@ -137,8 +182,13 @@ function CoverPreview({ form }: { form: FormState }) {
       <p className="docx-course">Course Code: {form.courseCode || 'Course code'}</p>
       <p className="docx-topic" data-testid="text-preview-topic">{form.topic || 'Assignment topic'}</p>
       <div className="docx-submission">
-        <p><strong>Submitted by-</strong></p>
-        {group ? members.map((member, index) => <p key={`preview-member-${index}`}>{member || `Member ${index + 1}`}</p>) : <><p>{form.studentName || 'Name'}</p><p><strong>ID:</strong> {form.studentId || 'ID'}</p><p><strong>Registration no:</strong> {form.registrationNo || 'Registration no'}</p></>}
+        {group ? <>
+          <p><strong>Submitted by — GROUP: {groupNoOf(form)}</strong></p>
+          <table className="docx-gtable" data-testid="table-group-members">
+            <thead><tr><th>Name</th><th>ID</th></tr></thead>
+            <tbody>{rows.map((row, index) => <tr key={`preview-group-${index}`}><td>{row.name}</td><td>{row.id}</td></tr>)}</tbody>
+          </table>
+        </> : <><p><strong>Submitted by-</strong></p><p>{form.studentName || 'Name'}</p><p><strong>ID:</strong> {form.studentId || 'ID'}</p><p><strong>Registration no:</strong> {form.registrationNo || 'Registration no'}</p></>}
       </div>
       <div className="docx-submitted-to">
         <p><strong>Submitted to-</strong></p>
@@ -156,9 +206,9 @@ function CoverPreview({ form }: { form: FormState }) {
 // white crest chip, hero topic typography, teal-labeled meta lines and tinted
 // "Submitted By / Submitted To" cards. All spacing mirrors createModernPdf()
 // so the PDF stays a 1:1 print.
-function ModernCover({ form, group, members }: { form: FormState; group: boolean; members: string[] }) {
+function ModernCover({ form, group, rows }: { form: FormState; group: boolean; rows: Array<{ name: string; id: string }> }) {
   return (
-    <div className="cover-paper docx-cover docx-mc" data-testid="modern-cover">
+    <div className={`cover-paper docx-cover docx-mc${group ? ' group-on' : ''}`} data-testid="modern-cover">
       <div className="mc-band">
         <span className="mc-strip" aria-hidden="true" />
         <img className="mc-chip-logo" src={logoPath} alt="BRUR crest" data-testid="img-preview-logo" />
@@ -173,9 +223,12 @@ function ModernCover({ form, group, members }: { form: FormState; group: boolean
       <p className="mc-meta"><strong>Course Code:</strong> {form.courseCode || 'Course code'}</p>
       <div className="mc-cards">
         <div className="mc-card mc-card-by">
-          <p className="mc-card-label">Submitted By</p>
+          <p className="mc-card-label">{group ? `Submitted By — Group: ${groupNoOf(form)}` : 'Submitted By'}</p>
           <div className="mc-card-rule" aria-hidden="true" />
-          {group ? members.map((member, index) => <p key={`mc-member-${index}`} className={`mc-name${index ? ' mc-next' : ''}`}>{member || `Member ${index + 1}`}</p>) : <>
+          {group ? <table className="mc-gtable" data-testid="table-group-members">
+            <thead><tr><th>Name</th><th>ID</th></tr></thead>
+            <tbody>{rows.map((row, index) => <tr key={`mc-group-${index}`}><td>{row.name}</td><td>{row.id}</td></tr>)}</tbody>
+          </table> : <>
             <p className="mc-name">{form.studentName || 'Name'}</p>
             <p className="mc-line"><strong>ID:</strong> {form.studentId || 'ID'}</p>
             <p className="mc-line"><strong>Registration no:</strong> {form.registrationNo || 'Registration no'}</p>
@@ -198,9 +251,9 @@ function ModernCover({ form, group, members }: { form: FormState; group: boolean
 // Professional design: university-standard framed cover with a double rule
 // border, gold accents and side-by-side "Submitted by / Submitted to" columns.
 // All spacing mirrors createProfessionalPdf() so the PDF stays a 1:1 print.
-function ProfessionalCover({ form, group, members }: { form: FormState; group: boolean; members: string[] }) {
+function ProfessionalCover({ form, group, rows }: { form: FormState; group: boolean; rows: Array<{ name: string; id: string }> }) {
   return (
-    <div className="cover-paper docx-cover docx-professional p-7 text-center sm:p-10">
+    <div className={`cover-paper docx-cover docx-professional${group ? ' group-on' : ''} p-7 text-center sm:p-10`}>
       <div className="pc-frame-outer" aria-hidden="true" />
       <div className="pc-frame-inner" aria-hidden="true" />
       <img className="pc-logo mx-auto object-contain" src={logoPath} alt="BRUR crest" data-testid="img-preview-logo" />
@@ -214,9 +267,12 @@ function ProfessionalCover({ form, group, members }: { form: FormState; group: b
       <div className="pc-topic" data-testid="text-preview-topic">{form.topic || 'Assignment topic'}</div>
       <div className="pc-columns">
         <div className="pc-col">
-          <p className="pc-col-label">Submitted By</p>
+          <p className="pc-col-label">{group ? `Submitted By — Group: ${groupNoOf(form)}` : 'Submitted By'}</p>
           <div className="pc-col-rule" aria-hidden="true" />
-          {group ? members.map((member, index) => <p key={`pc-member-${index}`} className={`pc-name${index ? ' pc-next' : ''}`}>{member || `Member ${index + 1}`}</p>) : <>
+          {group ? <table className="pc-gtable" data-testid="table-group-members">
+            <thead><tr><th>Name</th><th>ID</th></tr></thead>
+            <tbody>{rows.map((row, index) => <tr key={`pc-group-${index}`}><td>{row.name}</td><td>{row.id}</td></tr>)}</tbody>
+          </table> : <>
             <p className="pc-name">{form.studentName || 'Name'}</p>
             <p className="pc-line"><strong>ID:</strong> {form.studentId || 'ID'}</p>
             <p className="pc-line"><strong>Registration no:</strong> {form.registrationNo || 'Registration no'}</p>
@@ -248,7 +304,7 @@ function Home() {
   const [form, setForm] = useState<FormState>(() => {
     const savedForm = readSaved();
     // Every finish is unlocked now, so a saved professional or modern draft is honoured.
-    return savedForm ? { ...savedForm, design: savedForm.design === 'professional' || savedForm.design === 'modern' ? savedForm.design : 'simple', assignmentType: 'individual' } : initialState;
+    return savedForm ? { ...savedForm, design: savedForm.design === 'professional' || savedForm.design === 'modern' ? savedForm.design : 'simple', assignmentType: savedForm.assignmentType === 'group' ? 'group' : 'individual' } : initialState;
   });
   const [teacherQuery, setTeacherQuery] = useState('');
   const [saved, setSaved] = useState(Boolean(readSaved()));
@@ -283,7 +339,7 @@ function Home() {
     setForm({ ...previous, topic: `${previous.topic} — copy`, date: today });
     setNotice('Previous assignment copied into the workspace.');
   };
-  const updateMember = (index: number, value: string) => setForm((current) => ({ ...current, groupMembers: current.groupMembers.map((member, memberIndex) => memberIndex === index ? value : member) }));
+  const updateMember = (index: number, key: 'name' | 'id', value: string) => setForm((current) => ({ ...current, groupMembers: current.groupMembers.map((member, memberIndex) => memberIndex === index ? { ...member, [key]: value } : member) }));
   const download = async (kind: 'pdf' | 'txt' | 'doc') => {
     const title = form.topic || 'BRUR-assignment-cover';
     const cleanTitle = title.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
@@ -319,8 +375,8 @@ function Home() {
           <div className="no-print space-y-5">
             <section className="section-card rise-in" style={{ animationDelay: '.05s' }}><SectionTitle number="01" icon={<GraduationCap size={17} />} title="Course & department" note="Enter the class details for this submission." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Department" value={form.department} onChange={field('department')} placeholder="Optional" testId="input-department" /><Field label="Assignment" value={form.assignment} onChange={field('assignment')} testId="input-assignment" /><Field label="Session" value={form.session} onChange={field('session')} testId="input-session" /><Field label="Course title" value={form.courseTitle} onChange={field('courseTitle')} testId="input-course-title" /><Field label="Course code" value={form.courseCode} onChange={field('courseCode')} testId="input-course-code" /><Field label="Assignment topic" value={form.topic} onChange={field('topic')} placeholder="e.g. A comparative study of sorting algorithms" testId="input-topic" /></div></section>
             <section className="section-card rise-in" style={{ animationDelay: '.1s' }}><SectionTitle number="02" icon={<UserRound size={17} />} title="Submitted to" note="Search a teacher, then edit every detail as needed." /><div><span className="field-label">Search teacher name</span><div className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input className="input-shell input-with-icon" value={teacherQuery} onChange={(event) => setTeacherQuery(event.target.value)} placeholder="Search by name or faculty ID" data-testid="input-teacher-search" />{teacherQuery && <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{filteredTeachers.length ? filteredTeachers.map((teacher) => <button key={teacher.id} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-teal-50" onClick={() => chooseTeacher(teacher)} data-testid={`button-teacher-${teacher.id}`}><span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500">{teacher.id}</span><span><span className="block text-sm font-semibold text-slate-800">{teacher.name}</span><span className="block text-xs text-slate-500">{teacher.designation}</span></span></button>) : <p className="px-3 py-3 text-xs text-slate-500">No teacher match.</p>}</div>}</div></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Teacher name" value={form.teacherName} onChange={field('teacherName')} testId="input-teacher-name" /><Field label="Designation" value={form.teacherDesignation} onChange={field('teacherDesignation')} testId="input-teacher-designation" /><Field label="Department" value={form.teacherDepartment} onChange={field('teacherDepartment')} testId="input-teacher-department" /><Field label="University" value={form.university} onChange={field('university')} testId="input-university" /><Field label="Date of submission" value={form.date} onChange={field('date')} placeholder="DD/MM/YYYY" testId="input-date" /></div></section>
-            <section className="section-card rise-in" style={{ animationDelay: '.15s' }}><SectionTitle number="03" icon={<BookOpen size={17} />} title="Submitted by" note="Enter the student details shown on the cover." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Name" value={form.studentName} onChange={field('studentName')} testId="input-student-name" /><Field label="ID" value={form.studentId} onChange={field('studentId')} testId="input-student-id" /><Field label="Registration no." value={form.registrationNo} onChange={field('registrationNo')} testId="input-registration-no" /></div></section>
-             <section className="section-card rise-in" style={{ animationDelay: '.2s' }}><SectionTitle number="04" icon={<Users size={17} />} title="Assignment type" note="Individual cover is available now. Group cover is coming soon." /><div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1"><button className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 text-xs font-bold text-[#164a5b] shadow-sm" onClick={() => update('assignmentType', 'individual')} data-testid="button-individual"><UserRound size={15} /> Individual</button><button className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-400" disabled data-testid="button-group"><Users size={15} /> Group <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">Coming Soon</span></button></div></section>
+            <section className="section-card rise-in" style={{ animationDelay: '.15s' }}><SectionTitle number="03" icon={<BookOpen size={17} />} title="Submitted by" note="Enter the student details shown on the cover." />{form.assignmentType === 'group' ? <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-4 py-3.5 text-xs font-semibold leading-5 text-teal-800">Group submission is on — the member Name / ID table is edited in Step 04 below, and the individual fields are hidden while group mode is active.</div> : <div className="grid gap-4 sm:grid-cols-2"><Field label="Name" value={form.studentName} onChange={field('studentName')} testId="input-student-name" /><Field label="ID" value={form.studentId} onChange={field('studentId')} testId="input-student-id" /><Field label="Registration no." value={form.registrationNo} onChange={field('registrationNo')} testId="input-registration-no" /></div>}</section>
+             <section className="section-card rise-in" style={{ animationDelay: '.2s' }}><SectionTitle number="04" icon={<Users size={17} />} title="Assignment type" note="Individual or group (up to 5 members) — the cover adapts instantly." /><div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1"><button className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold ${form.assignmentType === 'individual' ? 'bg-white text-[#164a5b] shadow-sm' : 'text-slate-500'}`} onClick={() => update('assignmentType', 'individual')} data-testid="button-individual"><UserRound size={15} /> Individual</button><button className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold ${form.assignmentType === 'group' ? 'bg-white text-[#164a5b] shadow-sm' : 'text-slate-500'}`} onClick={() => update('assignmentType', 'group')} data-testid="button-group"><Users size={15} /> Group</button></div>{form.assignmentType === 'group' && <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Group number" value={form.groupNo} onChange={field('groupNo')} placeholder="e.g. 05" testId="input-group-no" /><label><span className="field-label">Number of members (max 5)</span><input className="input-shell" type="number" min={1} max={5} step={1} value={form.groupSize} onChange={(event) => update('groupSize', clampGroupSize(event.target.value))} data-testid="input-group-size" /></label></div><div className="space-y-3">{Array.from({ length: form.groupSize }, (_, index) => <div key={`member-slot-${index}`} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3"><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Member {index + 1}</p><div className="grid gap-3 sm:grid-cols-2"><Field label="Name" value={form.groupMembers[index]?.name ?? ''} onChange={(event) => updateMember(index, 'name', event.target.value)} placeholder={`Member ${index + 1} name`} testId={`input-member-name-${index}`} /><Field label="ID" value={form.groupMembers[index]?.id ?? ''} onChange={(event) => updateMember(index, 'id', event.target.value)} placeholder={`Member ${index + 1} ID`} testId={`input-member-id-${index}`} /></div></div>)}</div></div>}</section>
              <section className="section-card rise-in" style={{ animationDelay: '.25s' }}><SectionTitle number="05" icon={<LayoutTemplate size={17} />} title="Choose a finish" note="Simple, professional and modern covers are all ready." /><div className="grid gap-3 sm:grid-cols-3">{(['simple', 'professional', 'modern'] as Design[]).map((design) => <button key={design} onClick={() => update('design', design)} className={`template-option ${form.design === design ? 'template-option-active' : ''}`} data-testid={`button-template-${design}`}><div className={`template-mini mini-${design}`}><span /><span /><span /></div><span className="mt-2 block text-xs font-bold capitalize text-slate-700">{design}</span><span className="mt-0.5 block text-[10px] text-slate-400">{design === 'simple' ? 'Simple A4 cover' : design === 'professional' ? 'Framed two-column cover' : 'Bold banner cover'}</span>{form.design === design && <Check className="absolute right-2 top-2 text-teal-600" size={15} />}</button>)}</div></section>
             <div className="no-print flex items-center justify-between rounded-2xl border border-[#c7e9e2] bg-[#effaf7] p-4"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm"><Save size={16} /></div><div><p className="text-xs font-bold text-[#164a5b]">Keep your progress</p><p className="text-[11px] text-slate-500">Drafts stay in this browser only.</p></div></div><button className="rounded-xl bg-[#1a8d7f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#147666]" onClick={saveDraft} data-testid="button-save-draft">{saved && saveLabel === 'Save draft' ? 'Save again' : saveLabel}</button></div>
           </div>
@@ -333,8 +389,10 @@ function Home() {
 }
 
 function coverText(form: FormState) {
-  const members = form.groupMembers.filter(Boolean);
-  return `${form.university || 'BEGUM ROKEYA UNIVERSITY'}\n\n${form.assignment || 'ASSIGNMENT'}\n\n${form.topic || 'Untitled assignment'}\n\nCourse title: ${form.courseTitle}\nCourse code: ${form.courseCode}\nDepartment: ${form.department}\nSession: ${form.session}\n\nSubmitted by-\n${form.studentName}\nID: ${form.studentId}\nRegistration no: ${form.registrationNo}\n${members.length ? `\nGroup members:\n${members.map((member, index) => `Member ${index + 1}: ${member}`).join('\n')}\n` : ''}\nSubmitted to-\n${form.teacherName}\n${form.teacherDesignation}\n${form.teacherDepartment}\n${form.university}\nDate of submission: ${form.date}`;
+  const rows = groupRows(form);
+  const nameWidth = Math.max(4, ...rows.map((row) => row.name.length));
+  const groupTable = rows.length ? `\nSubmitted by — GROUP: ${groupNoOf(form)}\n\n${`Name${' '.repeat(nameWidth - 4)}  ID\n${rows.map((row) => `${row.name.padEnd(nameWidth)}  ${row.id}`).join('\n')}`}\n` : '';
+  return `${form.university || 'BEGUM ROKEYA UNIVERSITY'}\n\n${form.assignment || 'ASSIGNMENT'}\n\n${form.topic || 'Untitled assignment'}\n\nCourse title: ${form.courseTitle}\nCourse code: ${form.courseCode}\nDepartment: ${form.department}\nSession: ${form.session}\n\n${form.assignmentType === 'group' ? groupTable : `Submitted by-\n${form.studentName}\nID: ${form.studentId}\nRegistration no: ${form.registrationNo}\n`}\nSubmitted to-\n${form.teacherName}\n${form.teacherDesignation}\n${form.teacherDepartment}\n${form.university}\nDate of submission: ${form.date}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -476,7 +534,6 @@ function docxSectXml(margin: number, pageBorder: boolean) {
 }
 
 function docxValues(form: FormState) {
-  const members = form.assignmentType === 'group' ? form.groupMembers.filter(Boolean) : [];
   return {
     university: form.university || 'Begum Rokeya University',
     department: form.department || form.teacherDepartment || 'Department',
@@ -492,9 +549,23 @@ function docxValues(form: FormState) {
     teacherDesignation: form.teacherDesignation || 'Designation',
     teacherDepartment: form.teacherDepartment || 'Department',
     date: form.date || 'Date',
-    members,
+    members: groupRows(form),
+    groupNo: groupNoOf(form),
     group: form.assignmentType === 'group',
   };
+}
+
+// Bordered two-column Name/ID member table for group mode (grid borders,
+// tinted header row, fixed layout). Used directly or nested inside a cell.
+function docxGridTableXml(opts: { width: number; cols: number[]; header: string[]; rows: Array<Array<string>>; borderColor: string; headerFill?: string; headerColor?: string; sz?: number }) {
+  const edge = (name: string) => `<w:${name} w:val="single" w:sz="4" w:space="0" w:color="${opts.borderColor}"/>`;
+  const cell = (text: string, width: number, isHeader: boolean) => docxCellXml(
+    [docxParaXml({ segs: [dseg(text, { bold: isHeader, color: isHeader ? opts.headerColor : undefined })], sz: opts.sz ?? 22 })],
+    { width, shd: isHeader ? opts.headerFill : undefined, margin: { top: 46, bottom: 46, left: 115, right: 115 } },
+  );
+  const headRow = `<w:tr>${opts.header.map((text, index) => cell(text, opts.cols[index], true)).join('')}</w:tr>`;
+  const bodyRows = opts.rows.map((row) => `<w:tr>${row.map((text, index) => cell(text, opts.cols[index], false)).join('')}</w:tr>`).join('');
+  return `<w:tbl><w:tblPr><w:tblW w:w="${opts.width}" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders>${edge('top')}${edge('left')}${edge('bottom')}${edge('right')}${edge('insideH')}${edge('insideV')}</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${opts.cols.map((c) => `<w:gridCol w:w="${c}"/>`).join('')}</w:tblGrid>${headRow}${bodyRows}</w:tbl>`;
 }
 
 // Simple finish — centered Times layout mirroring the .docx-* preview styles.
@@ -511,21 +582,22 @@ function simpleDocxBody(form: FormState): string {
     docxParaXml({ segs: [dseg(`Course Code: ${v.courseCode}`)], sz: 25, align: 'center', before: 353, after: 907 }),
     docxTableXml(8461, [8461], [docxCellXml([docxParaXml({ segs: [dseg(v.topic, { bold: true })], sz: 32, color: DOCX_TOPIC_INK, align: 'center' })], { width: 8461, shd: DOCX_TOPIC_BG, margin: { top: 151, bottom: 151, left: 302, right: 302 } })]),
     docxBarXml(806, 0, undefined), // gap below the topic pill
-    docxParaXml({ segs: [dseg('Submitted by-', { bold: true })], sz: 25, indLeft: indent, indRight: indent }),
   ];
   if (v.group) {
-    v.members.forEach((member) => ps.push(docxParaXml({ segs: [dseg(member)], sz: 25, indLeft: indent, indRight: indent })));
+    ps.push(docxParaXml({ segs: [dseg(`Submitted by — GROUP: ${v.groupNo}`, { bold: true })], sz: 25, indLeft: indent, indRight: indent }));
+    ps.push(docxGridTableXml({ width: 8461, cols: [5077, 3384], header: ['Name', 'ID'], rows: v.members.map((row) => [row.name, row.id]), borderColor: 'C7D4DC', headerFill: 'F1F6F9', sz: 25 }));
   } else {
+    ps.push(docxParaXml({ segs: [dseg('Submitted by-', { bold: true })], sz: 25, indLeft: indent, indRight: indent }));
     ps.push(docxParaXml({ segs: [dseg(v.studentName)], sz: 25, indLeft: indent, indRight: indent }));
     ps.push(docxParaXml({ segs: [dseg('ID:', { bold: true }), dseg(` ${v.studentId}`)], sz: 25, indLeft: indent, indRight: indent }));
     ps.push(docxParaXml({ segs: [dseg('Registration no:', { bold: true }), dseg(` ${v.registrationNo}`)], sz: 25, indLeft: indent, indRight: indent }));
   }
-  ps.push(docxParaXml({ segs: [dseg('Submitted to-', { bold: true })], sz: 25, before: 806, indLeft: indent, indRight: indent }));
+  ps.push(docxParaXml({ segs: [dseg('Submitted to-', { bold: true })], sz: 25, before: v.group ? 403 : 806, indLeft: indent, indRight: indent }));
   ps.push(docxParaXml({ segs: [dseg(v.teacherName)], sz: 25, indLeft: indent, indRight: indent }));
   ps.push(docxParaXml({ segs: [dseg(v.teacherDesignation)], sz: 25, indLeft: indent, indRight: indent }));
   ps.push(docxParaXml({ segs: [dseg(v.teacherDepartment)], sz: 25, indLeft: indent, indRight: indent }));
   ps.push(docxParaXml({ segs: [dseg(v.university)], sz: 25, indLeft: indent, indRight: indent }));
-  ps.push(docxParaXml({ segs: [dseg('Date of submission:', { bold: true }), dseg(` ${v.date}`)], sz: 30, align: 'center', before: 1209 }));
+  ps.push(docxParaXml({ segs: [dseg('Date of submission:', { bold: true }), dseg(` ${v.date}`)], sz: 30, align: 'center', before: v.group ? 201 : 1209 }));
   return ps.join('');
 }
 
@@ -536,9 +608,10 @@ function professionalDocxBody(form: FormState): string {
   const ruleIndent = colWidth - 687; // 30px gold rule at the left edge of the cell
   const label = (text: string) => docxParaXml({ segs: [dseg(text, { bold: true, color: DOCX_NAVY, charSpace: 32 })], sz: 23 });
   const goldRule = () => docxBarXml(37, 69, DOCX_GOLD, 0, ruleIndent);
-  const byParas = [label('SUBMITTED BY'), goldRule()];
+  const byParas = [label(v.group ? `Submitted By — Group: ${v.groupNo}` : 'Submitted By'), goldRule()];
   if (v.group) {
-    v.members.forEach((member, index) => byParas.push(docxParaXml({ segs: [dseg(member, { bold: true })], sz: 26, before: index ? 92 : 183 })));
+    byParas.push(docxGridTableXml({ width: 3800, cols: [2280, 1520], header: ['Name', 'ID'], rows: v.members.map((row) => [row.name, row.id]), borderColor: 'B9CDD5', headerFill: 'F8FBFC', headerColor: DOCX_NAVY, sz: 22 }));
+    byParas.push(docxParaXml({ sz: 2 })); // OOXML requires a paragraph after a nested table
   } else {
     byParas.push(docxParaXml({ segs: [dseg(v.studentName, { bold: true })], sz: 26, before: 183 }));
     byParas.push(docxParaXml({ segs: [dseg('ID:', { bold: true, color: DOCX_NAVY }), dseg(` ${v.studentId}`)], sz: 24, before: 92 }));
@@ -564,7 +637,7 @@ function professionalDocxBody(form: FormState): string {
     docxTableXml(8461, [8461], [docxCellXml([docxParaXml({ segs: [dseg(v.topic, { bold: true, color: DOCX_NAVY })], sz: 32, align: 'center' })], { width: 8461, shd: DOCX_BAND_BG, borderTop: 20, borderBottom: 20, borderColor: DOCX_NAVY, margin: { top: 222, bottom: 222, left: 302, right: 302 } })]),
     docxBarXml(1007, 0, undefined), // gap between the topic band and the columns
     docxTableXml(8461, [colWidth, 539, colWidth], [docxCellXml(byParas, { width: colWidth }), docxSpacerCellXml(539), docxCellXml(toParas, { width: colWidth })]),
-    docxBarXml(3022, 0, undefined), // push the date toward the bottom like .pc-date
+    docxBarXml(v.group ? 2015 : 3022, 0, undefined), // push the date toward the bottom like .pc-date
     docxParaXml({ segs: [dseg('Date of submission:', { bold: true, color: DOCX_NAVY }), dseg(` ${v.date}`)], sz: 29, align: 'center' }),
   ];
   return ps.join('');
@@ -577,9 +650,10 @@ function modernDocxBody(form: FormState): string {
   const cardPadding = 320;
   const ruleIndent = cardWidth - 2 * cardPadding - 549; // 24px accent rule in the card
   const meta = (label: string, value: string, before: number, extra: Partial<DocxPara> = {}) => docxParaXml({ segs: [dseg(`${label}:`, { bold: true, color: DOCX_TEAL }), dseg(` ${value}`, { color: DOCX_SOFT })], sz: 26, align: 'center', before, ...extra });
-  const byParas = [docxParaXml({ segs: [dseg('SUBMITTED BY', { bold: true, color: DOCX_BY_LABEL, charSpace: 34 })], sz: 22 }), docxBarXml(69, 114, DOCX_TEAL_RULE, 0, ruleIndent)];
+  const byParas = [docxParaXml({ segs: [dseg(v.group ? `Submitted By — Group: ${v.groupNo}` : 'SUBMITTED BY', { bold: true, color: DOCX_BY_LABEL, charSpace: 34 })], sz: 22 }), docxBarXml(69, 114, DOCX_TEAL_RULE, 0, ruleIndent)];
   if (v.group) {
-    v.members.forEach((member, index) => byParas.push(docxParaXml({ segs: [dseg(member, { bold: true, color: DOCX_INK })], sz: 26, before: index ? 114 : 206 })));
+    byParas.push(docxGridTableXml({ width: 4400, cols: [2640, 1760], header: ['Name', 'ID'], rows: v.members.map((row) => [row.name, row.id]), borderColor: 'CFE2DC', headerFill: 'EAF5F2', headerColor: DOCX_BY_LABEL, sz: 23 }));
+    byParas.push(docxParaXml({ sz: 2 })); // OOXML requires a paragraph after a nested table
   } else {
     byParas.push(docxParaXml({ segs: [dseg(v.studentName, { bold: true, color: DOCX_INK })], sz: 26, before: 206 }));
     byParas.push(docxParaXml({ segs: [dseg('ID:', { bold: true, color: DOCX_HERO }), dseg(` ${v.studentId}`, { color: DOCX_SOFT })], sz: 24, before: 114 }));
@@ -608,7 +682,7 @@ function modernDocxBody(form: FormState): string {
     meta('Course Title', v.courseTitle, 160),
     meta('Course Code', v.courseCode, 160, { after: 595 }),
     docxTableXml(10477, [cardWidth, 366, cardWidth], [cardCell(byParas), docxSpacerCellXml(366), cardCell(toParas)]),
-    docxBarXml(2976, 0, undefined), // .mc-date gap
+    docxBarXml(v.group ? 1603 : 2976, 0, undefined), // .mc-date gap
     docxParaXml({ segs: [dseg('Date of submission:', { bold: true, color: DOCX_TEAL }), dseg(` ${v.date}`)], sz: 27, align: 'center' }),
   ];
   return ps.join('');
@@ -689,6 +763,93 @@ const PDF_MC_TEAL: [number, number, number] = [26, 141, 127]; // #1a8d7f — tea
 const PDF_MC_TEAL_BRIGHT: [number, number, number] = [26, 155, 134]; // #1a9b86 — BY rule
 const PDF_MC_BY_LABEL: [number, number, number] = [20, 122, 110]; // #147a6e — BY label ink
 const PDF_MC_TO_LABEL: [number, number, number] = [201, 79, 48]; // #c94f30 — TO label ink
+
+// Word-wraps a letter-spaced caps label into lines (browser-style greedy wrap,
+// trailing tracking counted per word like CSS letter-spacing).
+function spacedWrapLines(pdf: jsPDF, px: (value: number) => number, options: {
+  text: string; fontPx: number; csPx: number; maxW: number;
+}) {
+  const { text, fontPx, csPx, maxW } = options;
+  const cs = px(csPx);
+  pdf.setFont('times', 'bold');
+  pdf.setFontSize((fontPx * PDF_MM_PER_PX) / 0.352778);
+  const wordWidth = (word: string) => pdf.getTextWidth(word) + cs * word.length;
+  const spaceWidth = pdf.getTextWidth(' ') + cs;
+  const lines: string[][] = [];
+  let line: string[] = [];
+  let lineWidth = 0;
+  text.split(/\s+/).filter(Boolean).forEach((word) => {
+    const width = wordWidth(word);
+    const gap = line.length ? spaceWidth : 0;
+    if (line.length && lineWidth + gap + width > maxW) {
+      lines.push(line);
+      line = [word];
+      lineWidth = width;
+    } else {
+      line.push(word);
+      lineWidth += gap + width;
+    }
+  });
+  if (line.length) lines.push(line);
+  return lines;
+}
+
+// Draws a letter-spaced caps label with browser-style word wrapping (a long
+// "SUBMITTED BY — GROUP: nn" label wraps inside narrow columns/cards, so the
+// PDF must wrap the same way instead of shrinking the tracking). Returns the
+// number of lines drawn.
+function drawPdfSpacedWrap(pdf: jsPDF, px: (value: number) => number, fontPt: (value: number) => number, options: {
+  text: string; topPx: number; fontPx: number; csPx: number; x: number; maxW: number; color: [number, number, number];
+}) {
+  const { text, topPx, fontPx, csPx, x, maxW, color } = options;
+  const cs = px(csPx);
+  pdf.setFont('times', 'bold');
+  pdf.setFontSize(fontPt(fontPx));
+  pdf.setTextColor(color[0], color[1], color[2]);
+  const lines = spacedWrapLines(pdf, px, { text, fontPx, csPx, maxW });
+  lines.forEach((words, index) => {
+    const top = topPx + index * fontPx * PDF_LINE_HEIGHT;
+    pdf.text(words.join(' '), px(x), px(top + PDF_BASELINE * fontPx), { charSpace: cs });
+  });
+  return lines.length;
+}
+
+// Draws the bordered group member grid (Name | ID) with the exact geometry of
+// the .docx-gtable / .pc-gtable / .mc-gtable preview CSS: row height = font ×
+// line-height + 2·padY + 1px border, tinted header band, cell baselines at
+// padY + PDF_BASELINE·font so the print mirrors the browser 1:1.
+function drawPdfGroupGrid(pdf: jsPDF, px: (value: number) => number, fontPt: (value: number) => number, options: {
+  x: number; topPx: number; fontPx: number; colWidths: [number, number]; padX: number; padY: number;
+  header: [string, string]; rows: Array<{ name: string; id: string }>;
+  fill: [number, number, number]; border: [number, number, number];
+  headerColor: [number, number, number]; ink: [number, number, number];
+}) {
+  const { x, topPx, fontPx, colWidths, padX, padY } = options;
+  const tableWidth = colWidths[0] + colWidths[1];
+  const rowH = fontPx * PDF_LINE_HEIGHT + padY * 2 + 1;
+  const tableH = rowH * (options.rows.length + 1);
+  pdf.setFillColor(options.fill[0], options.fill[1], options.fill[2]);
+  pdf.rect(px(x), px(topPx), px(tableWidth), px(rowH), 'F');
+  pdf.setDrawColor(options.border[0], options.border[1], options.border[2]);
+  pdf.setLineWidth(px(0.75));
+  pdf.rect(px(x), px(topPx), px(tableWidth), px(tableH), 'S');
+  pdf.line(px(x), px(topPx + rowH), px(x + tableWidth), px(topPx + rowH));
+  pdf.line(px(x + colWidths[0]), px(topPx), px(x + colWidths[0]), px(topPx + tableH));
+  const cell = (text: string, cellX: number, rowTop: number, bold: boolean, color: [number, number, number]) => {
+    pdf.setFont('times', bold ? 'bold' : 'normal');
+    pdf.setFontSize(fontPt(fontPx));
+    pdf.setTextColor(color[0], color[1], color[2]);
+    pdf.text(text, px(cellX + padX), px(rowTop + padY + PDF_BASELINE * fontPx));
+  };
+  cell(options.header[0], x, topPx, true, options.headerColor);
+  cell(options.header[1], x + colWidths[0], topPx, true, options.headerColor);
+  options.rows.forEach((row, index) => {
+    const rowTop = topPx + rowH * (index + 1);
+    cell(row.name, x, rowTop, false, options.ink);
+    cell(row.id, x + colWidths[0], rowTop, false, options.ink);
+  });
+  return tableH;
+}
 const PDF_MC_HERO: [number, number, number] = [15, 58, 71]; // #0f3a47 — hero topic ink
 const PDF_MC_CARD: [number, number, number] = [244, 250, 249]; // #f4faf9 — card fill
 
@@ -807,16 +968,14 @@ async function createPdf(form: FormState) {
   // Submitted by / Submitted to: left-aligned inside an 84% block, bold labels + regular values.
   const blockLine = (segments: PdfSegment[], cursorPx: number) => drawSegments(segments, cursorPx, 11, { align: 'left', x: blockX, maxWidth: blockWidth });
   const isGroup = form.assignmentType === 'group';
-  const members = isGroup ? form.groupMembers.filter(Boolean) : [];
 
   top += margin.block;
-  top += advance(11, blockLine([{ text: 'Submitted by-', bold: true }], top));
   if (isGroup) {
-    members.forEach((member, index) => {
-      top += margin.paragraph;
-      top += advance(11, blockLine([{ text: member || `Member ${index + 1}`, bold: false }], top));
-    });
+    top += advance(11, blockLine([{ text: groupLabelOf(form), bold: true }], top));
+    top += 14.78; // .docx-gtable margin-top: 4% resolves against the 369.6px block, not the 440px box
+    top += drawPdfGroupGrid(pdf, px, fontPt, { x: blockX, topPx: top, fontPx: 11, colWidths: [221.76, 147.84], padX: 8, padY: 2, header: ['Name', 'ID'], rows: groupRows(form), fill: [241, 246, 249], border: [199, 212, 220], headerColor: PDF_INK, ink: PDF_INK });
   } else {
+    top += advance(11, blockLine([{ text: 'Submitted by-', bold: true }], top));
     top += margin.paragraph;
     top += advance(11, blockLine([{ text: form.studentName || 'Name', bold: false }], top));
     top += margin.paragraph;
@@ -836,7 +995,7 @@ async function createPdf(form: FormState) {
   top += margin.paragraph;
   top += advance(11, blockLine([{ text: form.university || 'University', bold: false }], top));
 
-  top += margin.date; // .docx-date margin-top: 12% of 440px = 52.8px
+  top += isGroup ? 8.8 : margin.date; // .docx-date margin-top: 12% of 440px; group mode .group-on: 2% = 8.8px
   drawSegments([{ text: 'Date of submission:', bold: true }, { text: form.date || 'Date', bold: false }], top, 13, { align: 'center' });
 
   pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
@@ -928,13 +1087,6 @@ async function createProfessionalPdf(form: FormState) {
     return lines.length;
   };
   const advance = (fontPx: number, lineCount: number) => lineCount * fontPx * PDF_LINE_HEIGHT;
-  // Letter-spaced caps line (mirrors CSS letter-spacing via jsPDF charSpace).
-  const drawSpaced = (text: string, topPx: number, fontPx: number, csPx: number, x?: number) => {
-    setRun(fontPx, true, PDF_NAVY);
-    const cs = px(csPx);
-    const width = pdf.getTextWidth(text) + cs * Math.max(text.length - 1, 0);
-    pdf.text(text, x ?? center - width / 2, px(topPx + PDF_BASELINE * fontPx), { charSpace: cs });
-  };
 
   // Vertical cursor in preview px; margins mirror the .pc-* CSS percentages
   // of the 440px content box (3.5% = 15.4px, 1.2% = 5.28px, ...).
@@ -996,21 +1148,18 @@ async function createProfessionalPdf(form: FormState) {
 
   // Submitted by / Submitted to: two left-aligned columns inside the 84% block.
   const isGroup = form.assignmentType === 'group';
-  const members = isGroup ? form.groupMembers.filter(Boolean) : [];
-  const drawColumn = (x: number, label: string, name: string | null, details: PdfSegment[][], memberList: string[] | null) => {
+  const drawColumn = (x: number, label: string, name: string | null, details: PdfSegment[][], group: Array<{ name: string; id: string }> | null) => {
     let cursor = top;
-    drawSpaced(label.toUpperCase(), cursor, 10, 1.4, x);
-    cursor += 10 * PDF_LINE_HEIGHT;
+    // Letter-spaced caps label; long group labels wrap word-by-word like the browser.
+    const labelLines = drawPdfSpacedWrap(pdf, px, fontPt, { text: label.toUpperCase(), topPx: cursor, fontPx: 10, csPx: 1.4, x, maxW: colWidth, color: PDF_NAVY });
+    cursor += 10 * PDF_LINE_HEIGHT * labelLines;
     pdf.setFillColor(PDF_GOLD[0], PDF_GOLD[1], PDF_GOLD[2]);
     pdf.rect(x, px(cursor + margin.labelRule), px(30), px(margin.colRuleH), 'F');
     cursor += margin.labelRule + margin.colRuleH + margin.name;
     if (name !== null) {
       cursor += advance(11.5, drawPara([{ text: name, bold: true }], cursor, 11.5, { align: 'left', x, maxWidth: colWidth, color: PDF_INK }));
-    } else if (memberList) {
-      memberList.forEach((member, index) => {
-        if (index) cursor += margin.line; // .pc-next
-        cursor += advance(11.5, drawPara([{ text: member, bold: true }], cursor, 11.5, { align: 'left', x, maxWidth: colWidth, color: PDF_INK }));
-      });
+    } else if (group) {
+      cursor += drawPdfGroupGrid(pdf, px, fontPt, { x, topPx: cursor, fontPx: 9.5, colWidths: [102.48, 68.32], padX: 5, padY: 2.5, header: ['Name', 'ID'], rows: group, fill: [248, 251, 252], border: [185, 205, 213], headerColor: PDF_NAVY, ink: PDF_INK });
     }
     details.forEach((segments) => {
       cursor += margin.line; // .pc-line margin-top: 4px
@@ -1020,11 +1169,11 @@ async function createProfessionalPdf(form: FormState) {
   };
 
   top += margin.cols; // .pc-columns margin-top: 10%
-  const leftBottom = drawColumn(colX[0], 'Submitted By', isGroup ? null : form.studentName || 'Name', isGroup ? [] : [[{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], [{ text: 'Registration no:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }]], isGroup ? members : null);
+  const leftBottom = drawColumn(colX[0], isGroup ? `Submitted By — Group: ${groupNoOf(form)}` : 'Submitted By', isGroup ? null : form.studentName || 'Name', isGroup ? [] : [[{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], [{ text: 'Registration no:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }]], isGroup ? groupRows(form) : null);
   const rightBottom = drawColumn(colX[1], 'Submitted To', form.teacherName || 'Teacher name', [[{ text: form.teacherDesignation || 'Designation', bold: false }], [{ text: form.teacherDepartment || 'Department', bold: false }], [{ text: form.university || 'University', bold: false }]], null);
   top = Math.max(leftBottom, rightBottom); // flex container height = tallest column
 
-  top += margin.date; // .pc-date margin-top: 30% of 440px = 132px
+  top += isGroup ? 88 : margin.date; // .pc-date margin-top: 30% of 440px = 132px; group mode .group-on: 20% = 88px
   drawPara([{ text: 'Date of submission:', bold: true }, { text: form.date || 'Date', bold: false }], top, 12.5, { align: 'center', boldColor: PDF_NAVY, regColor: PDF_INK });
 
   pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
@@ -1168,15 +1317,19 @@ async function createModernPdf(form: FormState) {
   // both cards to the tallest column, so the same two-pass measure/draw model
   // is used here: measure both columns, fill the card rectangles, then draw.
   const isGroup = form.assignmentType === 'group';
-  const members = isGroup ? form.groupMembers.filter(Boolean) : [];
   top += margin.cards;
   const cardsTop = top;
-  const makeColumn = (x: number, label: string, labelColor: [number, number, number], ruleColor: [number, number, number], name: string | null, details: PdfSegment[][], memberList: string[] | null) => {
+  const makeColumn = (x: number, label: string, labelColor: [number, number, number], ruleColor: [number, number, number], name: string | null, details: PdfSegment[][], group: Array<{ name: string; id: string }> | null) => {
     const innerX = px(x + margin.cardPad);
     return (draw: boolean) => {
       let cursor = cardsTop + margin.cardPad;
-      if (draw) drawSpaced(label.toUpperCase(), cursor, 9.5, 1.52, labelColor, innerX);
-      cursor += advance(9.5, 1);
+      // Letter-spaced caps label; long group labels wrap word-by-word like the
+      // browser. Measure pass counts lines without drawing.
+      const labelLines = spacedWrapLines(pdf, px, { text: label.toUpperCase(), fontPx: 9.5, csPx: 1.52, maxW: cardInner }).length;
+      if (draw) {
+        drawPdfSpacedWrap(pdf, px, fontPt, { text: label.toUpperCase(), topPx: cursor, fontPx: 9.5, csPx: 1.52, x: x + margin.cardPad, maxW: cardInner, color: labelColor });
+      }
+      cursor += advance(9.5, labelLines);
       if (draw) {
         pdf.setFillColor(ruleColor[0], ruleColor[1], ruleColor[2]);
         pdf.rect(innerX, px(cursor + margin.labelRule), px(24), px(margin.cardRuleH), 'F');
@@ -1185,11 +1338,9 @@ async function createModernPdf(form: FormState) {
       if (name !== null) {
         cursor += margin.name;
         cursor += advance(11.5, drawPara([{ text: name, bold: true }], cursor, 11.5, { align: 'left', x: innerX, maxWidth: cardInner, color: PDF_INK }));
-      } else if (memberList) {
-        memberList.forEach((member, index) => {
-          cursor += index ? margin.line : margin.name;
-          cursor += advance(11.5, drawPara([{ text: member, bold: true }], cursor, 11.5, { align: 'left', x: innerX, maxWidth: cardInner, color: PDF_INK }));
-        });
+      } else if (group) {
+        cursor += 9; // .mc-gtable margin-top: 1.7308cqw ≈ 9px
+        cursor += drawPdfGroupGrid(pdf, px, fontPt, { x: x + margin.cardPad, topPx: cursor, fontPx: 10, colWidths: [115.68, 77.12], padX: 5, padY: 2.5, header: ['Name', 'ID'], rows: group, fill: [234, 245, 242], border: [207, 226, 220], headerColor: PDF_MC_BY_LABEL, ink: PDF_INK });
       }
       details.forEach((segments) => {
         cursor += margin.line;
@@ -1198,7 +1349,7 @@ async function createModernPdf(form: FormState) {
       return cursor + margin.cardPad;
     };
   };
-  const leftBottomOf = makeColumn(31.2, 'Submitted By', PDF_MC_BY_LABEL, PDF_MC_TEAL_BRIGHT, isGroup ? null : form.studentName || 'Name', isGroup ? [] : [[{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], [{ text: 'Registration no:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }]], isGroup ? members : null);
+  const leftBottomOf = makeColumn(31.2, isGroup ? `Submitted By — Group: ${groupNoOf(form)}` : 'Submitted By', PDF_MC_BY_LABEL, PDF_MC_TEAL_BRIGHT, isGroup ? null : form.studentName || 'Name', isGroup ? [] : [[{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], [{ text: 'Registration no:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }]], isGroup ? groupRows(form) : null);
   const rightBottomOf = makeColumn(268, 'Submitted To', PDF_MC_TO_LABEL, PDF_MC_CORAL, form.teacherName || 'Teacher name', [[{ text: form.teacherDesignation || 'Designation', bold: false }], [{ text: form.teacherDepartment || 'Department', bold: false }], [{ text: form.university || 'University', bold: false }]], null);
   const cardsHeight = Math.max(leftBottomOf(false), rightBottomOf(false)) - cardsTop;
   pdf.setFillColor(PDF_MC_CARD[0], PDF_MC_CARD[1], PDF_MC_CARD[2]);
@@ -1208,7 +1359,7 @@ async function createModernPdf(form: FormState) {
   rightBottomOf(true);
 
   top = cardsTop + cardsHeight;
-  top += margin.date; // .mc-date margin-top: 130px (25cqw of the 520px sheet)
+  top += isGroup ? 70 : margin.date; // .mc-date margin-top: 130px (25cqw); group mode .group-on: 70px (13.4615cqw)
   drawPara([{ text: 'Date of submission:', bold: true }, { text: form.date || 'Date', bold: false }], top, 12, { align: 'center', boldColor: PDF_MC_TEAL, regColor: PDF_INK });
 
   pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
@@ -1217,9 +1368,11 @@ async function createModernPdf(form: FormState) {
 
 function coverHtml(form: FormState) {
   const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char] ?? char);
-  const members = form.groupMembers.filter(Boolean);
-  const memberMarkup = members.length ? `<p><strong>Group members:</strong><br>${members.map((member, index) => `Member ${index + 1}: ${escape(member)}`).join('<br>')}</p>` : '';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${escape(form.topic || 'BRUR assignment cover')}</title><style>@page{size:A4;margin:0}body{font-family:"Times New Roman",Times,serif;color:#111;margin:0}.cover{box-sizing:border-box;width:210mm;min-height:297mm;margin:auto;padding:24mm 25mm;text-align:center;border-top:2mm solid #1a8d7f}.logo{width:24mm;height:24mm;object-fit:contain;margin:0 auto 7mm}.university{font-size:24pt;font-weight:700;margin:0 0 5mm}.department{font-size:16pt;margin:0 0 20mm}.assignment{font-size:18pt;font-weight:700;margin:0 0 12mm}.meta{font-size:12pt;margin:0 0 4mm}.topic{display:inline-block;max-width:170mm;margin:10mm auto 0;padding:3mm 6mm;color:#2563eb;background:#eff6ff;font-size:16pt;font-weight:700}.details{width:160mm;margin:24mm auto 0;text-align:left;font-size:12pt;line-height:1.5}.details p{margin:0 0 8mm}.details strong{font-weight:700}.value{font-weight:400}.date{font-size:12pt;margin-top:24mm;text-align:center}</style></head><body><main class="cover"><img class="logo" src="${logoPath}" alt="BRUR logo"><p class="university">${escape(form.university || 'BEGUM ROKEYA UNIVERSITY')}</p><p class="department">${escape(form.department || form.teacherDepartment || 'Department')}</p><p class="assignment">${escape(form.assignment || 'ASSIGNMENT')}</p><p class="meta"><span>Course Code: </span><span class="value">${escape(form.courseCode)}</span></p><p class="meta"><span>Course Title: </span><span class="value">${escape(form.courseTitle)}</span></p><p class="meta"><strong>Session:</strong> <span class="value">${escape(form.session)}</span></p><p class="topic">${escape(form.topic || 'Untitled assignment')}</p><section class="details"><p><strong>Submitted by-</strong><br><span class="value">${escape(form.studentName)}</span><br><strong>ID:</strong> <span class="value">${escape(form.studentId)}</span><br><strong>Registration no:</strong> <span class="value">${escape(form.registrationNo)}</span></p>${memberMarkup}<p><strong>Submitted to-</strong><br><span class="value">${escape(form.teacherName)}<br>${escape(form.teacherDesignation)}<br>${escape(form.teacherDepartment)}<br>${escape(form.university)}</span></p><p class="date"><strong>Date of submission:</strong> <span class="value">${escape(form.date)}</span></p></section></main></body></html>`;
+  const rows = groupRows(form);
+  const groupBlock = form.assignmentType === 'group'
+    ? `<p><strong>Submitted by — GROUP: ${escape(groupNoOf(form))}</strong></p><table class="gtable"><thead><tr><th>Name</th><th>ID</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${escape(row.name)}</td><td>${escape(row.id)}</td></tr>`).join('')}</tbody></table>`
+    : `<p><strong>Submitted by-</strong><br><span class="value">${escape(form.studentName)}</span><br><strong>ID:</strong> <span class="value">${escape(form.studentId)}</span><br><strong>Registration no:</strong> <span class="value">${escape(form.registrationNo)}</span></p>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escape(form.topic || 'BRUR assignment cover')}</title><style>@page{size:A4;margin:0}body{font-family:"Times New Roman",Times,serif;color:#111;margin:0}.cover{box-sizing:border-box;width:210mm;min-height:297mm;margin:auto;padding:24mm 25mm;text-align:center;border-top:2mm solid #1a8d7f}.logo{width:24mm;height:24mm;object-fit:contain;margin:0 auto 7mm}.university{font-size:24pt;font-weight:700;margin:0 0 5mm}.department{font-size:16pt;margin:0 0 20mm}.assignment{font-size:18pt;font-weight:700;margin:0 0 12mm}.meta{font-size:12pt;margin:0 0 4mm}.topic{display:inline-block;max-width:170mm;margin:10mm auto 0;padding:3mm 6mm;color:#2563eb;background:#eff6ff;font-size:16pt;font-weight:700}.details{width:160mm;margin:24mm auto 0;text-align:left;font-size:12pt;line-height:1.5}.details p{margin:0 0 8mm}.details strong{font-weight:700}.value{font-weight:400}.gtable{border-collapse:collapse;width:100%;margin:0 0 8mm;font-size:12pt}.gtable th,.gtable td{border:1px solid #c7d4dc;padding:2mm 3mm;text-align:left}.gtable th{background:#f1f6f9}.date{font-size:12pt;margin-top:24mm;text-align:center}</style></head><body><main class="cover"><img class="logo" src="${logoPath}" alt="BRUR logo"><p class="university">${escape(form.university || 'BEGUM ROKEYA UNIVERSITY')}</p><p class="department">${escape(form.department || form.teacherDepartment || 'Department')}</p><p class="assignment">${escape(form.assignment || 'ASSIGNMENT')}</p><p class="meta"><span>Course Code: </span><span class="value">${escape(form.courseCode)}</span></p><p class="meta"><span>Course Title: </span><span class="value">${escape(form.courseTitle)}</span></p><p class="meta"><strong>Session:</strong> <span class="value">${escape(form.session)}</span></p><p class="topic">${escape(form.topic || 'Untitled assignment')}</p><section class="details">${groupBlock}<p><strong>Submitted to-</strong><br><span class="value">${escape(form.teacherName)}<br>${escape(form.teacherDesignation)}<br>${escape(form.teacherDepartment)}<br>${escape(form.university)}</span></p><p class="date"><strong>Date of submission:</strong> <span class="value">${escape(form.date)}</span></p></section></main></body></html>`;
 }
 
 function Router() {
