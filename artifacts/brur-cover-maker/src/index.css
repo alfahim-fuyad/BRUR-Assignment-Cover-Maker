@@ -163,6 +163,37 @@
 .pc-line { margin-top: 4px; margin-top: 0.9091cqw; font-size: 10.5px; font-size: 2.3864cqw; }
 .pc-line strong, .pc-date strong { font-weight: 700; color: #164a5b; }
 .pc-date { margin-top: 30%; font-size: 12.5px; font-size: 2.8409cqw; }
+/* ---- Modern design (bold banner cover) ----
+   The modern cover drops the paper padding, so 1cqw resolves against the full
+   520px sheet: 1cqw = 5.2px on the desktop preview. Every metric mirrors
+   createModernPdf() in App.tsx; px declarations are fallbacks. */
+.docx-mc { padding: 0; text-align: center; }
+.mc-band { position: relative; box-sizing: border-box; height: 200px; height: 38.4615cqw; padding-top: 36px; padding-top: 6.9231cqw; background: #164a5b; }
+.mc-orb { position: absolute; border-radius: 999px; }
+.mc-orb-a { width: 170px; width: 32.6923cqw; height: 170px; height: 32.6923cqw; top: -75px; top: -14.4231cqw; right: -55px; right: -10.5769cqw; background: #1d5c70; }
+.mc-orb-b { width: 14px; width: 2.6923cqw; height: 14px; height: 2.6923cqw; top: 168px; top: 32.3077cqw; left: 26px; left: 5cqw; background: #e56b51; }
+.mc-strip { position: absolute; bottom: 0; left: 0; right: 0; height: 4px; height: 0.7692cqw; background: #e56b51; }
+.mc-chip-logo { position: relative; display: block; box-sizing: border-box; width: 64px; width: 12.3077cqw; height: 64px; height: 12.3077cqw; margin: 0 auto; padding: 6px; padding: 1.1538cqw; background: #fff; border-radius: 14px; border-radius: 2.6923cqw; }
+.mc-university { position: relative; margin-top: 14px; margin-top: 2.6923cqw; font-size: 20px; font-size: 3.8462cqw; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.08em; padding-left: 0.08em; }
+.mc-department { position: relative; margin-top: 7px; margin-top: 1.3462cqw; font-size: 12.5px; font-size: 2.4038cqw; color: #cfe3ea; }
+.mc-eyebrow { margin-top: 30px; margin-top: 5.7692cqw; font-size: 11px; font-size: 2.1154cqw; font-weight: 700; color: #e56b51; text-transform: uppercase; letter-spacing: 0.24em; padding-left: 0.24em; }
+.mc-topic { margin: 12px auto 0; margin: 2.3077cqw auto 0; max-width: 88%; font-size: 22px; font-size: 4.2308cqw; font-weight: 700; color: #0f3a47; }
+.mc-hero-rule { width: 56px; width: 10.7692cqw; height: 4px; height: 0.7692cqw; margin: 14px auto 0; margin: 2.6923cqw auto 0; border-radius: 999px; background: #e56b51; }
+.mc-meta { margin-top: 7px; margin-top: 1.3462cqw; font-size: 11.5px; font-size: 2.2115cqw; color: #374151; }
+.mc-hero-rule + .mc-meta { margin-top: 20px; margin-top: 3.8462cqw; }
+.mc-meta strong { font-weight: 700; color: #1a8d7f; }
+.mc-cards { display: flex; gap: 16px; gap: 3.0769cqw; width: 88%; margin: 26px auto 0; margin: 5cqw auto 0; text-align: left; }
+.mc-card { flex: 1 1 0; min-width: 0; padding: 14px; padding: 2.6923cqw; border-radius: 10px; border-radius: 1.9231cqw; background: #f4faf9; }
+.mc-card-label { font-size: 9.5px; font-size: 1.8269cqw; font-weight: 700; color: #147a6e; text-transform: uppercase; letter-spacing: 0.16em; }
+.mc-card-to .mc-card-label { color: #c94f30; }
+.mc-card-rule { width: 24px; width: 4.6154cqw; height: 3px; height: 0.5769cqw; margin-top: 5px; margin-top: 0.9615cqw; border-radius: 999px; background: #1a9b86; }
+.mc-card-to .mc-card-rule { background: #e56b51; }
+.mc-name { margin-top: 9px; margin-top: 1.7308cqw; font-size: 11.5px; font-size: 2.2115cqw; font-weight: 700; color: #111; }
+.mc-next { margin-top: 5px; margin-top: 0.9615cqw; }
+.mc-line { margin-top: 5px; margin-top: 0.9615cqw; font-size: 10.5px; font-size: 2.0192cqw; color: #374151; }
+.mc-line strong { font-weight: 700; color: #0f3a47; }
+.mc-date { margin-top: 130px; margin-top: 25cqw; font-size: 12px; font-size: 2.3077cqw; text-align: center; }
+.mc-date strong { font-weight: 700; color: #1a8d7f; }
 .docx-modern { aspect-ratio: 11910 / 16845; }
 .docx-modern .docx-assignment { margin-top: 13%; }
 .docx-group .docx-topic { margin-top: 8%; }
@@ -181,8 +212,10 @@
 .mini-professional { @apply p-2; }
 .mini-professional::before { content: ''; position: absolute; width: 54px; height: 48px; border: 1px solid #1a8d7f; opacity: .35; }
 .mini-professional span:first-child { @apply h-5 w-5 rounded-full bg-teal-100; }
-.mini-modern { @apply items-start pl-5; border-left: 3px solid #e56b51; }
-.mini-modern span:first-child { @apply h-3 w-3 rounded-full bg-[#e56b51]; }
+.mini-modern { @apply relative items-start overflow-hidden pl-5; }
+.mini-modern::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 9px; background: #164a5b; }
+.mini-modern::after { content: ''; position: absolute; top: 13px; right: 8px; width: 8px; height: 8px; border-radius: 999px; background: #e56b51; }
+.mini-modern span:first-child { @apply h-3 w-3 rounded-full bg-[#1a9b86]; }
 @media print {
   body { background: white; }
   .no-print { display: none !important; }

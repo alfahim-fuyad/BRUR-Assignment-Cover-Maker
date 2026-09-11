@@ -129,6 +129,7 @@ function CoverPreview({ form }: { form: FormState }) {
   const members = form.assignmentType === 'group' ? form.groupMembers.filter(Boolean) : [];
   const group = form.assignmentType === 'group';
   if (form.design === 'professional') return <ProfessionalCover form={form} group={group} members={members} />;
+  if (form.design === 'modern') return <ModernCover form={form} group={group} members={members} />;
   return (
     <div className={`cover-paper docx-cover docx-${form.design} p-7 text-center sm:p-10`}>
       <img className="docx-logo mx-auto object-contain" src={logoPath} alt="BRUR crest" data-testid="img-preview-logo" />
@@ -151,6 +152,51 @@ function CoverPreview({ form }: { form: FormState }) {
         <p>{form.university || 'University'}</p>
       </div>
       <p className="docx-date"><strong>Date of submission:</strong> {form.date || 'Date'}</p>
+    </div>
+  );
+}
+
+// Modern design: bold full-bleed navy banner with soft geometric orbs and a
+// coral accent system, a white crest chip, hero topic typography, teal-labeled
+// meta lines and tinted "Submitted By / Submitted To" cards. All spacing
+// mirrors createModernPdf() so the PDF stays a 1:1 print.
+function ModernCover({ form, group, members }: { form: FormState; group: boolean; members: string[] }) {
+  return (
+    <div className="cover-paper docx-cover docx-mc" data-testid="modern-cover">
+      <div className="mc-band">
+        <span className="mc-orb mc-orb-a" aria-hidden="true" />
+        <span className="mc-orb mc-orb-b" aria-hidden="true" />
+        <span className="mc-strip" aria-hidden="true" />
+        <img className="mc-chip-logo" src={logoPath} alt="BRUR crest" data-testid="img-preview-logo" />
+        <p className="mc-university">{(form.university || 'Begum Rokeya University').toUpperCase()}</p>
+        <p className="mc-department">{form.department || form.teacherDepartment || 'Department'}</p>
+      </div>
+      <p className="mc-eyebrow">{(form.assignment || 'Assignment').toUpperCase()}</p>
+      <p className="mc-topic" data-testid="text-preview-topic">{form.topic || 'Assignment topic'}</p>
+      <div className="mc-hero-rule" aria-hidden="true" />
+      <p className="mc-meta"><strong>Session:</strong> {form.session || '2024-25'}</p>
+      <p className="mc-meta"><strong>Course Title:</strong> {form.courseTitle || 'Course title'}</p>
+      <p className="mc-meta"><strong>Course Code:</strong> {form.courseCode || 'Course code'}</p>
+      <div className="mc-cards">
+        <div className="mc-card mc-card-by">
+          <p className="mc-card-label">Submitted By</p>
+          <div className="mc-card-rule" aria-hidden="true" />
+          {group ? members.map((member, index) => <p key={`mc-member-${index}`} className={`mc-name${index ? ' mc-next' : ''}`}>{member || `Member ${index + 1}`}</p>) : <>
+            <p className="mc-name">{form.studentName || 'Name'}</p>
+            <p className="mc-line"><strong>ID:</strong> {form.studentId || 'ID'}</p>
+            <p className="mc-line"><strong>Registration no:</strong> {form.registrationNo || 'Registration no'}</p>
+          </>}
+        </div>
+        <div className="mc-card mc-card-to">
+          <p className="mc-card-label">Submitted To</p>
+          <div className="mc-card-rule" aria-hidden="true" />
+          <p className="mc-name">{form.teacherName || 'Teacher name'}</p>
+          <p className="mc-line">{form.teacherDesignation || 'Designation'}</p>
+          <p className="mc-line">{form.teacherDepartment || 'Department'}</p>
+          <p className="mc-line">{form.university || 'University'}</p>
+        </div>
+      </div>
+      <p className="mc-date"><strong>Date of submission:</strong> {form.date || 'Date'}</p>
     </div>
   );
 }
@@ -207,9 +253,8 @@ function SectionTitle({ number, icon, title, note }: { number: string; icon: Rea
 function Home() {
   const [form, setForm] = useState<FormState>(() => {
     const savedForm = readSaved();
-    // The professional cover is unlocked, so a saved professional draft is honoured;
-    // 'modern' is still coming soon and falls back to the simple cover.
-    return savedForm ? { ...savedForm, design: savedForm.design === 'professional' ? 'professional' : 'simple', assignmentType: 'individual' } : initialState;
+    // Every finish is unlocked now, so a saved professional or modern draft is honoured.
+    return savedForm ? { ...savedForm, design: savedForm.design === 'professional' || savedForm.design === 'modern' ? savedForm.design : 'simple', assignmentType: 'individual' } : initialState;
   });
   const [teacherQuery, setTeacherQuery] = useState('');
   const [saved, setSaved] = useState(Boolean(readSaved()));
@@ -249,7 +294,7 @@ function Home() {
     const title = form.topic || 'BRUR-assignment-cover';
     const cleanTitle = title.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     const blob = kind === 'pdf'
-      ? await (form.design === 'professional' ? createProfessionalPdf(form) : createPdf(form))
+      ? await (form.design === 'professional' ? createProfessionalPdf(form) : form.design === 'modern' ? createModernPdf(form) : createPdf(form))
       : kind === 'doc'
         ? await createDocx(form)
         : new Blob([coverText(form)], { type: 'text/plain;charset=utf-8' });
@@ -282,7 +327,7 @@ function Home() {
             <section className="section-card rise-in" style={{ animationDelay: '.1s' }}><SectionTitle number="02" icon={<UserRound size={17} />} title="Submitted to" note="Search a teacher, then edit every detail as needed." /><div><span className="field-label">Search teacher name</span><div className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input className="input-shell input-with-icon" value={teacherQuery} onChange={(event) => setTeacherQuery(event.target.value)} placeholder="Search by name or faculty ID" data-testid="input-teacher-search" />{teacherQuery && <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{filteredTeachers.length ? filteredTeachers.map((teacher) => <button key={teacher.id} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-teal-50" onClick={() => chooseTeacher(teacher)} data-testid={`button-teacher-${teacher.id}`}><span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500">{teacher.id}</span><span><span className="block text-sm font-semibold text-slate-800">{teacher.name}</span><span className="block text-xs text-slate-500">{teacher.designation}</span></span></button>) : <p className="px-3 py-3 text-xs text-slate-500">No teacher match.</p>}</div>}</div></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Teacher name" value={form.teacherName} onChange={field('teacherName')} testId="input-teacher-name" /><Field label="Designation" value={form.teacherDesignation} onChange={field('teacherDesignation')} testId="input-teacher-designation" /><Field label="Department" value={form.teacherDepartment} onChange={field('teacherDepartment')} testId="input-teacher-department" /><Field label="University" value={form.university} onChange={field('university')} testId="input-university" /><Field label="Date of submission" value={form.date} onChange={field('date')} placeholder="DD/MM/YYYY" testId="input-date" /></div></section>
             <section className="section-card rise-in" style={{ animationDelay: '.15s' }}><SectionTitle number="03" icon={<BookOpen size={17} />} title="Submitted by" note="Enter the student details shown on the cover." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Name" value={form.studentName} onChange={field('studentName')} testId="input-student-name" /><Field label="ID" value={form.studentId} onChange={field('studentId')} testId="input-student-id" /><Field label="Registration no." value={form.registrationNo} onChange={field('registrationNo')} testId="input-registration-no" /></div></section>
              <section className="section-card rise-in" style={{ animationDelay: '.2s' }}><SectionTitle number="04" icon={<Users size={17} />} title="Assignment type" note="Individual cover is available now. Group cover is coming soon." /><div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1"><button className="flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 text-xs font-bold text-[#164a5b] shadow-sm" onClick={() => update('assignmentType', 'individual')} data-testid="button-individual"><UserRound size={15} /> Individual</button><button className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-400" disabled data-testid="button-group"><Users size={15} /> Group <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">Coming Soon</span></button></div></section>
-             <section className="section-card rise-in" style={{ animationDelay: '.25s' }}><SectionTitle number="05" icon={<LayoutTemplate size={17} />} title="Choose a finish" note="Simple and professional covers are ready. Modern is coming soon." /><div className="grid gap-3 sm:grid-cols-3">{(['simple', 'professional', 'modern'] as Design[]).map((design) => { const available = design !== 'modern'; return <button key={design} onClick={() => available && update('design', design)} disabled={!available} className={`template-option ${form.design === design ? 'template-option-active' : ''} ${!available ? 'cursor-not-allowed opacity-70' : ''}`} data-testid={`button-template-${design}`}><div className={`template-mini mini-${design}`}><span /><span /><span /></div><span className="mt-2 block text-xs font-bold capitalize text-slate-700">{design}</span><span className="mt-0.5 block text-[10px] text-slate-400">{design === 'simple' ? 'Simple A4 cover' : design === 'professional' ? 'Framed two-column cover' : 'Coming Soon'}</span>{form.design === design && <Check className="absolute right-2 top-2 text-teal-600" size={15} />}{!available && <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">Coming Soon</span>}</button>; })}</div></section>
+             <section className="section-card rise-in" style={{ animationDelay: '.25s' }}><SectionTitle number="05" icon={<LayoutTemplate size={17} />} title="Choose a finish" note="Simple, professional and modern covers are all ready." /><div className="grid gap-3 sm:grid-cols-3">{(['simple', 'professional', 'modern'] as Design[]).map((design) => <button key={design} onClick={() => update('design', design)} className={`template-option ${form.design === design ? 'template-option-active' : ''}`} data-testid={`button-template-${design}`}><div className={`template-mini mini-${design}`}><span /><span /><span /></div><span className="mt-2 block text-xs font-bold capitalize text-slate-700">{design}</span><span className="mt-0.5 block text-[10px] text-slate-400">{design === 'simple' ? 'Simple A4 cover' : design === 'professional' ? 'Framed two-column cover' : 'Bold banner cover'}</span>{form.design === design && <Check className="absolute right-2 top-2 text-teal-600" size={15} />}</button>)}</div></section>
             <div className="no-print flex items-center justify-between rounded-2xl border border-[#c7e9e2] bg-[#effaf7] p-4"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm"><Save size={16} /></div><div><p className="text-xs font-bold text-[#164a5b]">Keep your progress</p><p className="text-[11px] text-slate-500">Drafts stay in this browser only.</p></div></div><button className="rounded-xl bg-[#1a8d7f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#147666]" onClick={saveDraft} data-testid="button-save-draft">{saved && saveLabel === 'Save draft' ? 'Save again' : saveLabel}</button></div>
           </div>
           <aside className="lg:sticky lg:top-6"><div className="no-print mb-3 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Live preview</p><h2 className="font-display text-lg font-bold text-[#164a5b]">Your cover, in focus.</h2></div><div className="rounded-full bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">A4 · {form.design}</div></div><div className="preview-frame soft-pop" data-testid="section-preview"><CoverPreview form={form} /></div><div className="no-print mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white/75 px-3.5 py-3 text-xs text-slate-500"><Sparkles size={14} className="shrink-0 text-[#e56b51]" /><span>Updates as you type. Print when the details feel right.</span><ArrowRight size={14} className="ml-auto shrink-0 text-slate-300" /></div></aside>
@@ -458,6 +503,18 @@ const PDF_GOLD: [number, number, number] = [185, 151, 63]; // #b9973f — accent
 const PDF_SOFT: [number, number, number] = [55, 65, 81]; // #374151 — secondary ink
 const PDF_HAIR: [number, number, number] = [157, 184, 194]; // #9db8c2 — inner hairline
 const PDF_BAND: [number, number, number] = [248, 251, 252]; // #f8fbfc — topic band fill
+
+// Modern design palette (mirrors the .mc-* styles in index.css).
+const PDF_WHITE: [number, number, number] = [255, 255, 255];
+const PDF_MC_MIST: [number, number, number] = [207, 227, 234]; // #cfe3ea — banner department ink
+const PDF_MC_ORB: [number, number, number] = [29, 92, 112]; // #1d5c70 — banner orb
+const PDF_MC_CORAL: [number, number, number] = [229, 107, 81]; // #e56b51 — coral accent
+const PDF_MC_TEAL: [number, number, number] = [26, 141, 127]; // #1a8d7f — teal label ink
+const PDF_MC_TEAL_BRIGHT: [number, number, number] = [26, 155, 134]; // #1a9b86 — BY rule
+const PDF_MC_BY_LABEL: [number, number, number] = [20, 122, 110]; // #147a6e — BY label ink
+const PDF_MC_TO_LABEL: [number, number, number] = [201, 79, 48]; // #c94f30 — TO label ink
+const PDF_MC_HERO: [number, number, number] = [15, 58, 71]; // #0f3a47 — hero topic ink
+const PDF_MC_CARD: [number, number, number] = [244, 250, 249]; // #f4faf9 — card fill
 
 type PdfSegment = { text: string; bold: boolean };
 
@@ -793,6 +850,192 @@ async function createProfessionalPdf(form: FormState) {
 
   top += margin.date; // .pc-date margin-top: 30% of 440px = 132px
   drawPara([{ text: 'Date of submission:', bold: true }, { text: form.date || 'Date', bold: false }], top, 12.5, { align: 'center', boldColor: PDF_NAVY, regColor: PDF_INK });
+
+  pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
+  return pdf.output('blob');
+}
+
+// Modern cover PDF: mirrors the .mc-* preview CSS 1:1 with the same
+// preview-px -> mm mapping as the other designs (520px sheet -> A4). The
+// modern cover drops the paper padding, so on the desktop preview 1cqw
+// resolves against the full 520px sheet: the CSS cqw values and the PDF
+// cursor below use the exact same pixel numbers.
+async function createModernPdf(form: FormState) {
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const px = (value: number) => value * PDF_MM_PER_PX;
+  const fontPt = (value: number) => (value * PDF_MM_PER_PX) / 0.352778;
+  const center = 105;
+  const contentWidth = px(440); // banner text keeps a 40px gutter on each side
+  const heroWidth = px(457.6); // .mc-topic / .mc-cards width: 88% of the 520px sheet
+  const cardInner = px(192.8); // card 220.8px minus its 14px padding on each side
+
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 0, 210, 297, 'F');
+
+  // Full-bleed navy banner, soft geometric orb accents and the coral base strip.
+  pdf.setFillColor(PDF_NAVY[0], PDF_NAVY[1], PDF_NAVY[2]);
+  pdf.rect(0, 0, 210, px(196), 'F');
+  pdf.setFillColor(PDF_MC_ORB[0], PDF_MC_ORB[1], PDF_MC_ORB[2]);
+  pdf.circle(px(490), px(10), px(85), 'F');
+  pdf.setFillColor(PDF_MC_CORAL[0], PDF_MC_CORAL[1], PDF_MC_CORAL[2]);
+  pdf.circle(px(33), px(175), px(7), 'F');
+  pdf.rect(0, px(196), 210, px(4), 'F');
+
+  // Crest chip: white rounded square with the BRUR crest inset.
+  try {
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(px(228), px(36), px(64), px(64), px(14), px(14), 'F');
+    const logoData = await loadImageDataUrl(logoPath);
+    pdf.addImage(logoData, 'PNG', px(234), px(42), px(52), px(52), undefined, 'FAST');
+  } catch {
+    // The cover remains usable if a browser blocks the optional logo rasterization.
+  }
+
+  const setRun = (fontPx: number, bold: boolean, color: [number, number, number]) => {
+    pdf.setFont('times', bold ? 'bold' : 'normal');
+    pdf.setFontSize(fontPt(fontPx));
+    pdf.setTextColor(color[0], color[1], color[2]);
+  };
+
+  // Word-wrap bold/regular segments exactly like the browser wraps the preview text.
+  const wrap = (segments: PdfSegment[], fontPx: number, maxWidth: number) => {
+    const words: PdfSegment[] = [];
+    segments.forEach((segment) => String(segment.text).split(/\s+/).filter(Boolean).forEach((word) => words.push({ text: word, bold: segment.bold })));
+    setRun(fontPx, false, PDF_INK);
+    const spaceWidth = pdf.getTextWidth(' ');
+    const lines: Array<Array<PdfSegment & { gap: number; width: number }>> = [];
+    let line: Array<PdfSegment & { gap: number; width: number }> = [];
+    let lineWidth = 0;
+    words.forEach((word) => {
+      setRun(fontPx, word.bold, PDF_INK);
+      const wordWidth = pdf.getTextWidth(word.text);
+      const gap = line.length ? spaceWidth : 0;
+      if (line.length && lineWidth + gap + wordWidth > maxWidth) {
+        lines.push(line);
+        line = [{ text: word.text, bold: word.bold, gap: 0, width: wordWidth }];
+        lineWidth = wordWidth;
+      } else {
+        line.push({ text: word.text, bold: word.bold, gap, width: gap + wordWidth });
+        lineWidth += gap + wordWidth;
+      }
+    });
+    if (line.length) lines.push(line);
+    return lines;
+  };
+
+  // Draws one paragraph; bold words take boldColor, regular words regColor.
+  const drawPara = (segments: PdfSegment[], topPx: number, fontPx: number, options: { align?: 'center' | 'left'; x?: number; maxWidth?: number; boldColor?: [number, number, number]; regColor?: [number, number, number]; color?: [number, number, number] } = {}) => {
+    const lines = wrap(segments, fontPx, options.maxWidth ?? contentWidth);
+    const boldColor = options.boldColor ?? options.color ?? PDF_INK;
+    const regColor = options.regColor ?? options.color ?? PDF_INK;
+    lines.forEach((line, index) => {
+      const total = line.reduce((sum, word) => sum + word.width, 0);
+      let cursor = options.align === 'left' ? (options.x ?? 0) : center - total / 2;
+      const baseline = px(topPx + index * fontPx * PDF_LINE_HEIGHT + PDF_BASELINE * fontPx);
+      line.forEach((word) => {
+        setRun(fontPx, word.bold, word.bold ? boldColor : regColor);
+        pdf.text(word.text, cursor + word.gap, baseline);
+        cursor += word.width;
+      });
+    });
+    return lines.length;
+  };
+  const advance = (fontPx: number, lineCount: number) => lineCount * fontPx * PDF_LINE_HEIGHT;
+  // Letter-spaced caps line (mirrors CSS letter-spacing via jsPDF charSpace).
+  const drawSpaced = (text: string, topPx: number, fontPx: number, csPx: number, color: [number, number, number], x?: number) => {
+    setRun(fontPx, true, color);
+    const cs = px(csPx);
+    const width = pdf.getTextWidth(text) + cs * Math.max(text.length - 1, 0);
+    pdf.text(text, x ?? center - width / 2, px(topPx + PDF_BASELINE * fontPx), { charSpace: cs });
+  };
+
+  // Banner contents (fixed positions inside the 196px navy area).
+  const universityText = (form.university || 'Begum Rokeya University').toUpperCase();
+  setRun(20, true, PDF_WHITE);
+  const csUni = px(1.6); // letter-spacing: 0.08em of 20px
+  if (pdf.getTextWidth(universityText) + csUni * Math.max(universityText.length - 1, 0) <= contentWidth) {
+    drawSpaced(universityText, 114, 20, 1.6, PDF_WHITE);
+  } else {
+    drawPara([{ text: universityText, bold: true }], 114, 20, { align: 'center', maxWidth: contentWidth, color: PDF_WHITE });
+  }
+  drawPara([{ text: form.department || form.teacherDepartment || 'Department', bold: false }], 144, 12.5, { align: 'center', maxWidth: contentWidth, color: PDF_MC_MIST });
+
+  // Vertical cursor in preview px; margins mirror the .mc-* CSS.
+  const margin = { eyebrow: 30, topic: 12, rule: 14, ruleH: 4, metaFirst: 20, meta: 7, cards: 26, cardPad: 14, labelRule: 5, cardRuleH: 3, name: 9, line: 5, date: 130 };
+  let top = 200; // banner bottom edge (196px navy + 4px coral strip)
+  top += margin.eyebrow;
+  const assignmentText = (form.assignment || 'Assignment').toUpperCase();
+  setRun(11, true, PDF_MC_CORAL);
+  const csEyebrow = px(2.64); // letter-spacing: 0.24em of 11px
+  const eyebrowWidth = pdf.getTextWidth(assignmentText) + csEyebrow * Math.max(assignmentText.length - 1, 0);
+  if (eyebrowWidth <= contentWidth) {
+    pdf.text(assignmentText, center - eyebrowWidth / 2, px(top + PDF_BASELINE * 11), { charSpace: csEyebrow });
+    top += advance(11, 1);
+  } else {
+    top += advance(11, drawPara([{ text: assignmentText, bold: true }], top, 11, { align: 'center', maxWidth: contentWidth, color: PDF_MC_CORAL }));
+  }
+
+  top += margin.topic;
+  top += advance(22, drawPara([{ text: form.topic || 'Assignment topic', bold: true }], top, 22, { align: 'center', maxWidth: heroWidth, color: PDF_MC_HERO }));
+
+  top += margin.rule;
+  pdf.setFillColor(PDF_MC_CORAL[0], PDF_MC_CORAL[1], PDF_MC_CORAL[2]);
+  pdf.rect(center - px(28), px(top), px(56), px(margin.ruleH), 'F');
+  top += margin.ruleH;
+
+  top += margin.metaFirst;
+  top += advance(11.5, drawPara([{ text: 'Session:', bold: true }, { text: form.session || '2024-25', bold: false }], top, 11.5, { align: 'center', boldColor: PDF_MC_TEAL, regColor: PDF_SOFT }));
+  top += margin.meta;
+  top += advance(11.5, drawPara([{ text: 'Course Title:', bold: true }, { text: form.courseTitle || 'Course title', bold: false }], top, 11.5, { align: 'center', boldColor: PDF_MC_TEAL, regColor: PDF_SOFT }));
+  top += margin.meta;
+  top += advance(11.5, drawPara([{ text: 'Course Code:', bold: true }, { text: form.courseCode || 'Course code', bold: false }], top, 11.5, { align: 'center', boldColor: PDF_MC_TEAL, regColor: PDF_SOFT }));
+
+  // Submitted By / Submitted To tinted cards. The browser flex row stretches
+  // both cards to the tallest column, so the same two-pass measure/draw model
+  // is used here: measure both columns, fill the card rectangles, then draw.
+  const isGroup = form.assignmentType === 'group';
+  const members = isGroup ? form.groupMembers.filter(Boolean) : [];
+  top += margin.cards;
+  const cardsTop = top;
+  const makeColumn = (x: number, label: string, labelColor: [number, number, number], ruleColor: [number, number, number], name: string | null, details: PdfSegment[][], memberList: string[] | null) => {
+    const innerX = px(x + margin.cardPad);
+    return (draw: boolean) => {
+      let cursor = cardsTop + margin.cardPad;
+      if (draw) drawSpaced(label.toUpperCase(), cursor, 9.5, 1.52, labelColor, innerX);
+      cursor += advance(9.5, 1);
+      if (draw) {
+        pdf.setFillColor(ruleColor[0], ruleColor[1], ruleColor[2]);
+        pdf.rect(innerX, px(cursor + margin.labelRule), px(24), px(margin.cardRuleH), 'F');
+      }
+      cursor += margin.labelRule + margin.cardRuleH;
+      if (name !== null) {
+        cursor += margin.name;
+        cursor += advance(11.5, drawPara([{ text: name, bold: true }], cursor, 11.5, { align: 'left', x: innerX, maxWidth: cardInner, color: PDF_INK }));
+      } else if (memberList) {
+        memberList.forEach((member, index) => {
+          cursor += index ? margin.line : margin.name;
+          cursor += advance(11.5, drawPara([{ text: member, bold: true }], cursor, 11.5, { align: 'left', x: innerX, maxWidth: cardInner, color: PDF_INK }));
+        });
+      }
+      details.forEach((segments) => {
+        cursor += margin.line;
+        cursor += advance(10.5, drawPara(segments, cursor, 10.5, { align: 'left', x: innerX, maxWidth: cardInner, boldColor: PDF_MC_HERO, regColor: PDF_SOFT }));
+      });
+      return cursor + margin.cardPad;
+    };
+  };
+  const leftBottomOf = makeColumn(31.2, 'Submitted By', PDF_MC_BY_LABEL, PDF_MC_TEAL_BRIGHT, isGroup ? null : form.studentName || 'Name', isGroup ? [] : [[{ text: 'ID:', bold: true }, { text: form.studentId || 'ID', bold: false }], [{ text: 'Registration no:', bold: true }, { text: form.registrationNo || 'Registration no', bold: false }]], isGroup ? members : null);
+  const rightBottomOf = makeColumn(268, 'Submitted To', PDF_MC_TO_LABEL, PDF_MC_CORAL, form.teacherName || 'Teacher name', [[{ text: form.teacherDesignation || 'Designation', bold: false }], [{ text: form.teacherDepartment || 'Department', bold: false }], [{ text: form.university || 'University', bold: false }]], null);
+  const cardsHeight = Math.max(leftBottomOf(false), rightBottomOf(false)) - cardsTop;
+  pdf.setFillColor(PDF_MC_CARD[0], PDF_MC_CARD[1], PDF_MC_CARD[2]);
+  pdf.roundedRect(px(31.2), px(cardsTop), px(220.8), px(cardsHeight), px(10), px(10), 'F');
+  pdf.roundedRect(px(268), px(cardsTop), px(220.8), px(cardsHeight), px(10), px(10), 'F');
+  leftBottomOf(true);
+  rightBottomOf(true);
+
+  top = cardsTop + cardsHeight;
+  top += margin.date; // .mc-date margin-top: 130px (25cqw of the 520px sheet)
+  drawPara([{ text: 'Date of submission:', bold: true }, { text: form.date || 'Date', bold: false }], top, 12, { align: 'center', boldColor: PDF_MC_TEAL, regColor: PDF_INK });
 
   pdf.setProperties({ title: form.topic || 'BRUR assignment cover', subject: 'A4 assignment cover' });
   return pdf.output('blob');
