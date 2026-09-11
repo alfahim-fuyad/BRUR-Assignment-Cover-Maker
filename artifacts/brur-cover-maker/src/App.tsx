@@ -610,7 +610,9 @@ function professionalDocxBody(form: FormState): string {
   const goldRule = () => docxBarXml(37, 69, DOCX_GOLD, 0, ruleIndent);
   const byParas = [label(v.group ? `Submitted By — Group: ${v.groupNo}` : 'Submitted By'), goldRule()];
   if (v.group) {
-    byParas.push(docxGridTableXml({ width: 3800, cols: [2280, 1520], header: ['Name', 'ID'], rows: v.members.map((row) => [row.name, row.id]), borderColor: 'B9CDD5', headerFill: 'F8FBFC', headerColor: DOCX_NAVY, sz: 22 }));
+    // 3744 twips fits the 3961 host cell minus its 2×108 default side margins
+    // (3745) — a wider nested table pokes out of the column in Word/GDocs.
+    byParas.push(docxGridTableXml({ width: 3744, cols: [2246, 1498], header: ['Name', 'ID'], rows: v.members.map((row) => [row.name, row.id]), borderColor: 'B9CDD5', headerFill: 'F8FBFC', headerColor: DOCX_NAVY, sz: 22 }));
     byParas.push(docxParaXml({ sz: 2 })); // OOXML requires a paragraph after a nested table
   } else {
     byParas.push(docxParaXml({ segs: [dseg(v.studentName, { bold: true })], sz: 26, before: 183 }));
@@ -637,7 +639,7 @@ function professionalDocxBody(form: FormState): string {
     docxTableXml(8461, [8461], [docxCellXml([docxParaXml({ segs: [dseg(v.topic, { bold: true, color: DOCX_NAVY })], sz: 32, align: 'center' })], { width: 8461, shd: DOCX_BAND_BG, borderTop: 20, borderBottom: 20, borderColor: DOCX_NAVY, margin: { top: 222, bottom: 222, left: 302, right: 302 } })]),
     docxBarXml(1007, 0, undefined), // gap between the topic band and the columns
     docxTableXml(8461, [colWidth, 539, colWidth], [docxCellXml(byParas, { width: colWidth }), docxSpacerCellXml(539), docxCellXml(toParas, { width: colWidth })]),
-    docxBarXml(v.group ? 2015 : 3022, 0, undefined), // push the date toward the bottom like .pc-date
+    docxBarXml(v.group ? 400 : 3022, 0, undefined), // group rows grow with wrapped member names, so keep the date right under the columns (stays one page)
     docxParaXml({ segs: [dseg('Date of submission:', { bold: true, color: DOCX_NAVY }), dseg(` ${v.date}`)], sz: 29, align: 'center' }),
   ];
   return ps.join('');
@@ -817,7 +819,9 @@ function drawPdfSpacedWrap(pdf: jsPDF, px: (value: number) => number, fontPt: (v
 // Draws the bordered group member grid (Name | ID) with the exact geometry of
 // the .docx-gtable / .pc-gtable / .mc-gtable preview CSS: row height = font ×
 // line-height + 2·padY + 1px border, tinted header band, cell baselines at
-// padY + PDF_BASELINE·font so the print mirrors the browser 1:1.
+// padY + PDF_BASELINE·font. Cell text word-wraps inside its own column exactly
+// like a browser <td> — a long member name grows its row instead of spilling
+// into the ID cell — and every row gets its border-collapse separator line.
 function drawPdfGroupGrid(pdf: jsPDF, px: (value: number) => number, fontPt: (value: number) => number, options: {
   x: number; topPx: number; fontPx: number; colWidths: [number, number]; padX: number; padY: number;
   header: [string, string]; rows: Array<{ name: string; id: string }>;
@@ -826,28 +830,87 @@ function drawPdfGroupGrid(pdf: jsPDF, px: (value: number) => number, fontPt: (va
 }) {
   const { x, topPx, fontPx, colWidths, padX, padY } = options;
   const tableWidth = colWidths[0] + colWidths[1];
-  const rowH = fontPx * PDF_LINE_HEIGHT + padY * 2 + 1;
-  const tableH = rowH * (options.rows.length + 1);
-  pdf.setFillColor(options.fill[0], options.fill[1], options.fill[2]);
-  pdf.rect(px(x), px(topPx), px(tableWidth), px(rowH), 'F');
-  pdf.setDrawColor(options.border[0], options.border[1], options.border[2]);
-  pdf.setLineWidth(px(0.75));
-  pdf.rect(px(x), px(topPx), px(tableWidth), px(tableH), 'S');
-  pdf.line(px(x), px(topPx + rowH), px(x + tableWidth), px(topPx + rowH));
-  pdf.line(px(x + colWidths[0]), px(topPx), px(x + colWidths[0]), px(topPx + tableH));
-  const cell = (text: string, cellX: number, rowTop: number, bold: boolean, color: [number, number, number]) => {
+  // All cell metrics run in PDF mm: widths come from getTextWidth (mm) so the
+  // wrap limit and the word advance must both be converted with px() first.
+  // Browser-style greedy wrap of one cell's words at the cell font (bold
+  // included — Times bold runs wider); returns the wrapped line count.
+  const wrapCount = (text: string, colPx: number, bold: boolean) => {
+    pdf.setFont('times', bold ? 'bold' : 'normal');
+    pdf.setFontSize(fontPt(fontPx));
+    const spaceWidth = pdf.getTextWidth(' ');
+    const width = px(colPx - padX * 2);
+    let lines = 1;
+    let lineWidth = 0;
+    String(text).split(/\s+/).filter(Boolean).forEach((word) => {
+      const wordWidth = pdf.getTextWidth(word);
+      const gap = lineWidth > 0 ? spaceWidth : 0;
+      if (lineWidth > 0 && lineWidth + gap + wordWidth > width) {
+        lines += 1;
+        lineWidth = wordWidth;
+      } else {
+        lineWidth += gap + wordWidth;
+      }
+    });
+    return lines;
+  };
+  const rowHeight = (cells: string[], bold: boolean) =>
+    Math.max(...cells.map((text, index) => wrapCount(text, colWidths[index], bold))) * fontPx * PDF_LINE_HEIGHT + padY * 2 + 1;
+  // Draws one cell's text word-by-word (same wrap model as the preview <td>);
+  // the pen runs in mm from the px-converted cell origin.
+  const drawCell = (text: string, cellX: number, colIndex: number, rowTop: number, bold: boolean, color: [number, number, number]) => {
     pdf.setFont('times', bold ? 'bold' : 'normal');
     pdf.setFontSize(fontPt(fontPx));
     pdf.setTextColor(color[0], color[1], color[2]);
-    pdf.text(text, px(cellX + padX), px(rowTop + padY + PDF_BASELINE * fontPx));
+    const width = px(colWidths[colIndex] - padX * 2);
+    const spaceWidth = pdf.getTextWidth(' ');
+    const lines: string[][] = [];
+    let line: string[] = [];
+    let lineWidth = 0;
+    String(text).split(/\s+/).filter(Boolean).forEach((word) => {
+      const wordWidth = pdf.getTextWidth(word);
+      const gap = line.length ? spaceWidth : 0;
+      if (line.length && lineWidth + gap + wordWidth > width) {
+        lines.push(line);
+        line = [word];
+        lineWidth = wordWidth;
+      } else {
+        line.push(word);
+        lineWidth += gap + wordWidth;
+      }
+    });
+    if (line.length) lines.push(line);
+    lines.forEach((words, index) => {
+      let cursor = px(cellX + padX); // mm from here on
+      const baseline = px(rowTop + padY + (index * PDF_LINE_HEIGHT + PDF_BASELINE) * fontPx);
+      words.forEach((word) => {
+        pdf.text(word, cursor, baseline);
+        cursor += pdf.getTextWidth(word) + spaceWidth;
+      });
+    });
   };
-  cell(options.header[0], x, topPx, true, options.headerColor);
-  cell(options.header[1], x + colWidths[0], topPx, true, options.headerColor);
-  options.rows.forEach((row, index) => {
-    const rowTop = topPx + rowH * (index + 1);
-    cell(row.name, x, rowTop, false, options.ink);
-    cell(row.id, x + colWidths[0], rowTop, false, options.ink);
+  const headerRow = [options.header[0], options.header[1]];
+  const bodyRows = options.rows.map((row) => [row.name, row.id]);
+  const heights = [rowHeight(headerRow, true), ...bodyRows.map((cells) => rowHeight(cells, false))];
+  const tableH = heights.reduce((sum, height) => sum + height, 0);
+  pdf.setFillColor(options.fill[0], options.fill[1], options.fill[2]);
+  pdf.rect(px(x), px(topPx), px(tableWidth), px(heights[0]), 'F');
+  pdf.setDrawColor(options.border[0], options.border[1], options.border[2]);
+  pdf.setLineWidth(px(0.75));
+  pdf.rect(px(x), px(topPx), px(tableWidth), px(tableH), 'S');
+  let rowTop = topPx;
+  heights.forEach((height, index) => {
+    if (index > 0) pdf.line(px(x), px(rowTop), px(x + tableWidth), px(rowTop)); // border-collapse separator
+    if (index === 0) {
+      drawCell(headerRow[0], x, 0, rowTop, true, options.headerColor);
+      drawCell(headerRow[1], x + colWidths[0], 1, rowTop, true, options.headerColor);
+    } else {
+      const cells = bodyRows[index - 1];
+      drawCell(cells[0], x, 0, rowTop, false, options.ink);
+      drawCell(cells[1], x + colWidths[0], 1, rowTop, false, options.ink);
+    }
+    rowTop += height;
   });
+  pdf.line(px(x + colWidths[0]), px(topPx), px(x + colWidths[0]), px(topPx + tableH));
   return tableH;
 }
 const PDF_MC_HERO: [number, number, number] = [15, 58, 71]; // #0f3a47 — hero topic ink
@@ -1016,7 +1079,12 @@ async function createProfessionalPdf(form: FormState) {
   const blockX = (210 - blockWidth) / 2;
   const colGap = px(28); // .pc-columns gap: 6.36% of 440px
   const colWidth = (blockWidth - colGap) / 2;
-  const colX = [blockX, blockX + colWidth + colGap];
+  // Column origins in PREVIEW px (75.2 / 274). The label/grid helpers take a
+  // preview-px x and convert internally, and the raw pdf.* calls in
+  // drawColumn convert at the use site — passing the mm origins here made
+  // every helper x twice-scaled, which stacked both columns on the left edge
+  // (labels printed over the group table).
+  const colX = [(520 - 369.6) / 2, (520 - 369.6) / 2 + (369.6 - 28) / 2 + 28];
 
   pdf.setFillColor(255, 255, 255);
   pdf.rect(0, 0, 210, 297, 'F');
@@ -1154,16 +1222,16 @@ async function createProfessionalPdf(form: FormState) {
     const labelLines = drawPdfSpacedWrap(pdf, px, fontPt, { text: label.toUpperCase(), topPx: cursor, fontPx: 10, csPx: 1.4, x, maxW: colWidth, color: PDF_NAVY });
     cursor += 10 * PDF_LINE_HEIGHT * labelLines;
     pdf.setFillColor(PDF_GOLD[0], PDF_GOLD[1], PDF_GOLD[2]);
-    pdf.rect(x, px(cursor + margin.labelRule), px(30), px(margin.colRuleH), 'F');
+    pdf.rect(px(x), px(cursor + margin.labelRule), px(30), px(margin.colRuleH), 'F');
     cursor += margin.labelRule + margin.colRuleH + margin.name;
     if (name !== null) {
-      cursor += advance(11.5, drawPara([{ text: name, bold: true }], cursor, 11.5, { align: 'left', x, maxWidth: colWidth, color: PDF_INK }));
+      cursor += advance(11.5, drawPara([{ text: name, bold: true }], cursor, 11.5, { align: 'left', x: px(x), maxWidth: colWidth, color: PDF_INK }));
     } else if (group) {
       cursor += drawPdfGroupGrid(pdf, px, fontPt, { x, topPx: cursor, fontPx: 9.5, colWidths: [102.48, 68.32], padX: 5, padY: 2.5, header: ['Name', 'ID'], rows: group, fill: [248, 251, 252], border: [185, 205, 213], headerColor: PDF_NAVY, ink: PDF_INK });
     }
     details.forEach((segments) => {
       cursor += margin.line; // .pc-line margin-top: 4px
-      cursor += advance(10.5, drawPara(segments, cursor, 10.5, { align: 'left', x, maxWidth: colWidth, boldColor: PDF_NAVY, regColor: PDF_INK }));
+      cursor += advance(10.5, drawPara(segments, cursor, 10.5, { align: 'left', x: px(x), maxWidth: colWidth, boldColor: PDF_NAVY, regColor: PDF_INK }));
     });
     return cursor;
   };
